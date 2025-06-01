@@ -1,3 +1,19 @@
+const express = require("express");
+const dotenv = require("dotenv");
+const nodemailer = require("nodemailer");
+const csurf = require("csurf");
+const winston = require("winston");
+const db = require("../utils/db.js");
+dotenv.config({ path: "./.env" });
+const app = express.Router();
+const csrfProtection = csurf({ cookie: true });
+
+const logger = winston.createLogger({
+  level: "info",
+  format: winston.format.json(),
+  transports: [new winston.transports.File({ filename: "logs.log" })],
+});
+
 app.post("/checkout", csrfProtection, async (req, res) => {
   const { username, cartItems, totalAmount, couponCode } = req.body;
   const products = JSON.stringify(cartItems);
@@ -111,3 +127,5 @@ app.post("/checkout", csrfProtection, async (req, res) => {
     });
   });
 });
+
+module.exports = app;
