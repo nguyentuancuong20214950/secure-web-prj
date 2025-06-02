@@ -13,7 +13,6 @@ const passport = require("passport");
 const multer = require("multer");
 const path = require("path");
 const rateLimit = require("express-rate-limit");
-require("./auth");
 const userrouter = require("./routes/user.js");
 const adminrouter = require("./routes/adminrouter.js");
 const checkout = require("./routes/checkout.js");

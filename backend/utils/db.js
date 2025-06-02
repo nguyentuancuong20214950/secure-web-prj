@@ -1,14 +1,16 @@
-const mysql = require("mysql");
+const mysql = require("mysql2");
 const dotenv = require("dotenv");
 const winston = require("winston");
 dotenv.config({ path: "./.env" });
 
+// Logger setup
 const logger = winston.createLogger({
   level: "info",
   format: winston.format.json(),
   transports: [new winston.transports.File({ filename: "logs.log" })],
 });
 
+// MySQL connection
 const db = mysql.createConnection({
   host: process.env.DATABASE_HOST,
   user: process.env.DATABASE_USER,
@@ -16,19 +18,17 @@ const db = mysql.createConnection({
   database: process.env.DATABASE,
 });
 
-db.connect((error, req) => {
+// Connect to MySQL
+db.connect((error) => {
   if (error) {
     logger.error("MySQL connection error", {
-      error,
-      ip: req.ip,
-      userAgent: req.get("User-Agent"),
-      url: req.originalUrl,
+      error: error.message,
       timestamp: new Date().toISOString(),
     });
-    console.log(error);
+    console.error("MySQL connection error:", error.message);
   } else {
     logger.info("MySQL connected", { timestamp: new Date().toISOString() });
-    console.log("MySQL connected...");
+    console.log("✅ MySQL connected...");
   }
 });
 
