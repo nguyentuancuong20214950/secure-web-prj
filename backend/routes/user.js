@@ -14,30 +14,6 @@ const PWD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@$&*()]).{8,24}$/;
 
 const refreshTokens = [];
 
-const validateCaptcha = async (captchaToken) => {
-  const secretKey = process.env.RECAPTCHA_SECRET_KEY;
-  if (!secretKey) {
-    logger.error("reCAPTCHA secret key is not set.", {
-      timestamp: new Date().toISOString(),
-    });
-    return false;
-  }
-
-  const verifyUrl = `https://www.google.com/recaptcha/api/siteverify?secret=${secretKey}&response=${captchaToken}`;
-
-  try {
-    const recaptchaRes = await fetch(verifyUrl, { method: "POST" });
-    const recaptchaJson = await recaptchaRes.json();
-    return recaptchaJson.success;
-  } catch (err) {
-    logger.error("Error validating CAPTCHA", {
-      error: err,
-      timestamp: new Date().toISOString(),
-    });
-    return false;
-  }
-};
-
 const logger = winston.createLogger({
   level: "info",
   format: winston.format.json(),
@@ -47,16 +23,6 @@ const logger = winston.createLogger({
 const adminrouter = express.Router();
 
 adminrouter.post("/login", csrfProtection, async (req, res) => {
-  const captchaValid = await validateCaptcha(req.body.captchaToken);
-  if (!captchaValid) {
-    logger.warn("Invalid CAPTCHA during login", {
-      ip: req.ip,
-      userAgent: req.get("User-Agent"),
-      url: req.originalUrl,
-      timestamp: new Date().toISOString(),
-    });
-    return res.status(400).send({ Error: "Invalid CAPTCHA" });
-  }
 
   const v1 = USER_REGEX.test(req.body.username);
   const v2 = PWD_REGEX.test(req.body.password);
