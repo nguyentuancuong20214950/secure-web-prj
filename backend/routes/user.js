@@ -23,7 +23,6 @@ const logger = winston.createLogger({
 const adminrouter = express.Router();
 
 adminrouter.post("/login", csrfProtection, async (req, res) => {
-
   const v1 = USER_REGEX.test(req.body.username);
   const v2 = PWD_REGEX.test(req.body.password);
   if (!v1 || !v2) {
@@ -55,41 +54,60 @@ adminrouter.post("/login", csrfProtection, async (req, res) => {
               logger.info(
                 `User ${username} has logged in successfully as admin.`
               );
-              const token = jwt.sign(
-                { username, role },
-                process.env.TOKEN_SECRET,
-                { expiresIn: "7200s" }
-              );
-              const refreshToken = jwt.sign(
-                { username, role },
-                process.env.REFRESH_TOKEN_SECRET,
-                { expiresIn: "630000s" }
-              );
-              refreshTokens.push(refreshToken);
-              res.cookie("access-token", token, {
-                httpOnly: true,
-                secure: true,
+              db.query(sqlVersion, [username], (err, versionResult) => {
+                if (err) {
+                  return res
+                    .status(500)
+                    .json({ Error: "Token version query failed" });
+                }
+
+                const tokenVersion =
+                  versionResult.length > 0 ? versionResult[0].token_version : 1;
+                const token = jwt.sign(
+                  {
+                    username,
+                    userType: role,
+                    tokenVersion,
+                    ip: req.ip,
+                    ua: req.get("User-Agent"),
+                  },
+                  process.env.TOKEN_SECRET,
+                  { expiresIn: "1800s" }
+                );
+                res.cookie("access-token", token, {
+                  httpOnly: true,
+                  secure: true,
+                });
               });
 
               return res.json({
                 Status: "Success",
                 Role: { role },
                 token,
-                refreshToken,
               });
             } else {
               logger.info(`User ${username} has logged in successfully.`);
-              const token = jwt.sign(
-                { username, role },
-                process.env.TOKEN_SECRET,
-                { expiresIn: "7200s" }
-              );
-              const refreshToken = jwt.sign(
-                { username, role },
-                process.env.REFRESH_TOKEN_SECRET,
-                { expiresIn: "630000s" }
-              );
-              refreshTokens.push(refreshToken);
+              db.query(sqlVersion, [username], (err, versionResult) => {
+                if (err) {
+                  return res
+                    .status(500)
+                    .json({ Error: "Token version query failed" });
+                }
+
+                const tokenVersion =
+                  versionResult.length > 0 ? versionResult[0].token_version : 1;
+                const token = jwt.sign(
+                  {
+                    username,
+                    userType: role,
+                    tokenVersion,
+                    ip: req.ip,
+                    ua: req.get("User-Agent"),
+                  },
+                  process.env.TOKEN_SECRET,
+                  { expiresIn: "1800s" }
+                );
+              });
               res.cookie("access-token", token, {
                 httpOnly: true,
                 secure: true,
@@ -99,7 +117,6 @@ adminrouter.post("/login", csrfProtection, async (req, res) => {
                 Status: "Success",
                 Role: { role },
                 token,
-                refreshToken,
               });
             }
           } else {
