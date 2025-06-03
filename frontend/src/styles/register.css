@@ -1,0 +1,73 @@
+/* register.css */
+
+/* Error message */
+.errmsg {
+    color: red;
+  }
+  
+  /* Success message (if needed) */
+  .success {
+    color: green;
+  }
+  
+  /* Hide elements offscreen */
+  .offscreen {
+    position: absolute;
+    left: -9999px;
+  }
+  
+  /* Validation icons */
+  .valid {
+    color: green;
+  }
+  
+  .invalid {
+    color: red;
+  }
+  
+  .hide {
+    display: none;
+  }
+  
+  /* Form styling */
+  .form {
+    margin-bottom: 20px;
+  }
+  
+  .form__group {
+    margin-bottom: 20px;
+  }
+  
+  .form__group label {
+    display: block;
+    margin-bottom: 5px;
+  }
+  
+  .form__group input[type="text"],
+  .form__group input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    margin: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+  }
+  
+  /* Instructions for input fields */
+  .instructions {
+    margin-top: 5px;
+    font-size: 14px;
+  }
+  
+  /* Link styling */
+  a {
+    display: block;
+    margin-top: 20px;
+    text-decoration: none;
+    color: blue;
+  }
+  
+  a:hover {
+    text-decoration: underline;
+  }
+  

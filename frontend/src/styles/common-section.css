@@ -1,0 +1,11 @@
+.common__section {
+  background: linear-gradient(#212245b2, #212245b2),
+    url("../assets/images/pizza.png");
+
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  padding: 50px 0px;
+  margin-top: 30px;
+  margin-bottom: 20px;
+}

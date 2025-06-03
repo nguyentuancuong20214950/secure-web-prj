@@ -19,16 +19,19 @@ const db = mysql.createConnection({
 });
 
 // Connect to MySQL
-db.connect((error) => {
+db.connect((error, req) => {
   if (error) {
     logger.error("MySQL connection error", {
-      error: error.message,
+      error,
+      ip: req.ip,
+      userAgent: req.get("User-Agent"),
+      url: req.originalUrl,
       timestamp: new Date().toISOString(),
     });
-    console.error("MySQL connection error:", error.message);
+    console.log(error);
   } else {
     logger.info("MySQL connected", { timestamp: new Date().toISOString() });
-    console.log("✅ MySQL connected...");
+    console.log("MySQL connected...");
   }
 });
 

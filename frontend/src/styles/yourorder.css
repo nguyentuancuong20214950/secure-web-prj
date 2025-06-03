@@ -1,0 +1,27 @@
+/* Add these styles to your CSS file */
+
+.order-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+  }
+  
+  .order-table th, .order-table td {
+    padding: 12px 15px;
+    text-align: left;
+  }
+  
+  .order-table th {
+    background-color: #f2f2f2;
+  }
+  
+  .order-table tbody tr:nth-child(even) {
+    background-color: #f9f9f9;
+  }
+  
+  .order-table img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+  

@@ -1,0 +1,39 @@
+.active-tabs{
+    content:"";
+    border: none;
+    display:block;
+    position: absolute;
+    top:-5px;
+    left:50%;
+    transform:translateC(-50%);
+    width:calc(100%+2px);
+    height:5px;
+    background: rgb(255,0,0);
+}
+
+.content-tabs{
+    border:none;
+}
+
+.box{
+    border:2px solid grey;
+    width: 200px;
+    margin-top:50px;
+}
+
+.tabs{
+    display:flex;
+    justify-content: space-between;
+}
+
+.tab{
+    background: #ccc;
+    flex:1;
+    padding: 10px;
+    text-align: center;
+    border: 1px solid grey;
+    border-top: none;
+    cursor: pointer;
+    position: relative;
+}
+
