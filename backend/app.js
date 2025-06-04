@@ -1,6 +1,7 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
+const nodemailer = require('nodemailer');
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const cookieParser = require("cookie-parser");
@@ -13,7 +14,7 @@ const passport = require("passport");
 const multer = require("multer");
 const path = require("path");
 const rateLimit = require("express-rate-limit");
-require("./auth");
+// require("./auth");
 const userrouter = require("./routes/user.js");
 const adminrouter = require("./routes/adminrouter.js");
 const checkout = require("./routes/checkout.js");
@@ -290,6 +291,7 @@ async function sendVerificationEmail(email, code) {
 
 app.post("/verify-email", csrfProtection, async (req, res) => {
   const { username, code } = req.body;
+  console.log("VERIFY REQUEST BODY:", { username, code });
   const MAX_ATTEMPTS = 5;
 
   if (!username || !code) {
@@ -299,7 +301,7 @@ app.post("/verify-email", csrfProtection, async (req, res) => {
   const sql = `SELECT * FROM email_verification WHERE username = ?`;
   db.query(sql, [username], (err, results) => {
     if (err) return res.status(500).json({ Error: "Database error" });
-
+    console.log("EMAIL_VERIFICATION QUERY RESULT:", results);
     if (results.length === 0) {
       return res.status(400).json({ Error: "No verification code found" });
     }
@@ -317,6 +319,7 @@ app.post("/verify-email", csrfProtection, async (req, res) => {
     }
 
     if (record.code !== code) {
+      console.log("Verification failed: wrong code. Provided:", code, "Expected:", record.code);
       db.query(
         "UPDATE email_verification SET attempts = attempts + 1 WHERE username = ?",
         [username]
@@ -818,3 +821,9 @@ app.post("/reset_password_after_otp", csrfProtection, async (req, res) => {
     });
   });
 });
+
+const PORT = process.env.PORT || 5001;
+app.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});
+

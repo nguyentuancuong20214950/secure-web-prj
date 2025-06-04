@@ -3,3 +3,17 @@
 {"level":"info","message":"MySQL connected","timestamp":"2025-06-02T14:40:14.940Z"}
 {"level":"info","message":"MySQL connected","timestamp":"2025-06-02T18:56:59.323Z"}
 {"level":"info","message":"MySQL connected","timestamp":"2025-06-02T19:26:09.818Z"}
+{"level":"info","message":"MySQL connected","timestamp":"2025-06-03T04:33:06.532Z"}
+{"level":"info","message":"MySQL connected","timestamp":"2025-06-03T09:54:33.651Z"}
+{"level":"info","message":"MySQL connected","timestamp":"2025-06-04T05:24:04.155Z"}
+{"level":"info","message":"MySQL connected","timestamp":"2025-06-04T08:31:32.652Z"}
+{"level":"info","message":"MySQL connected","timestamp":"2025-06-04T08:35:09.517Z"}
+{"error":{"code":"ER_DUP_ENTRY","errno":1062,"sql":"INSERT INTO users (username, email, password, role) VALUES ('thanh', 'trancongthanha6@gmail.com', '$2b$10$6Gw25sf8x2j2PyhWoYNC4.KUj/mOa/NLp8inzh6DpaghpldYr3CVC', 'user')","sqlMessage":"Duplicate entry 'trancongthanha6@gmail.com' for key 'users.email'","sqlState":"23000"},"ip":"::1","level":"error","message":"Database error during registration","timestamp":"2025-06-04T08:36:13.322Z","url":"/register","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0"}
+{"error":{"code":"ER_DUP_ENTRY","errno":1062,"sql":"INSERT INTO users (username, email, password, role) VALUES ('thanh1', 'trancongthanha6@gmail.com', '$2b$10$Jb4ayDoo086Hh..RlezlV.KZ8Hgk8NiNqTGDFtQ83aQcf1TmfoTZG', 'user')","sqlMessage":"Duplicate entry 'trancongthanha6@gmail.com' for key 'users.email'","sqlState":"23000"},"ip":"::1","level":"error","message":"Database error during registration","timestamp":"2025-06-04T08:37:00.676Z","url":"/register","userAgent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0"}
+{"level":"info","message":"MySQL connected","timestamp":"2025-06-04T08:40:06.400Z"}
+{"level":"info","message":"MySQL connected","timestamp":"2025-06-04T09:03:33.978Z"}
+{"level":"info","message":"Verification code sent to trancongthanha6@gmail.com"}
+{"level":"info","message":"Verification code sent to trancongthanha6@gmail.com"}
+{"level":"info","message":"MySQL connected","timestamp":"2025-06-04T10:04:01.623Z"}
+{"level":"info","message":"Verification code sent to trancongthanha6@gmail.com"}
+{"level":"info","message":"User thanh has logged in successfully."}

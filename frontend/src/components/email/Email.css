@@ -1,5 +1,5 @@
 
-    .google_btn {
+    .email_btn {
     width: 230px;
     height: 40px;
     border-radius: 5px;
@@ -19,7 +19,7 @@
     justify-content: center;
   }
   
-  .google_btn img {
+  .email_btn img {
     width: 24px;
     height: 24px;
     margin-right: 10px;
