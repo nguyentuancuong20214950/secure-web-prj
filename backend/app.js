@@ -340,20 +340,40 @@ let refreshTokens = [];
 app.post("/verify-2fa", csrfProtection, (req, res) => {
   const { username, code } = req.body;
   const ip = req.ip;
+  const MAX_ATTEMPTS = 5;
 
-  const sql = `
+  const sqlSelect = `
     SELECT * FROM pending_2fa
-    WHERE username = ? AND code = ? AND ip_address = ? AND expires_at > NOW()
+    WHERE username = ? AND ip_address = ?
   `;
-  db.query(sql, [username, code, ip], (err, results) => {
+  db.query(sqlSelect, [username, ip], (err, results) => {
     if (err || results.length === 0) {
       return res.status(400).json({ Error: "Invalid or expired code" });
     }
 
+    const record = results[0];
+    if (
+      new Date(record.expires_at) < new Date() ||
+      record.attempts >= MAX_ATTEMPTS
+    ) {
+      db.query("DELETE FROM pending_2fa WHERE username = ?", [username]);
+      return res
+        .status(400)
+        .json({ Error: "Code expired or too many attempts" });
+    }
+
+    if (record.code !== code) {
+      db.query(
+        "UPDATE pending_2fa SET attempts = attempts + 1 WHERE username = ?",
+        [username]
+      );
+      return res.status(400).json({ Error: "Invalid verification code" });
+    }
+
+    // đúng mã => reset attempt và tạo phiên
+    db.query("DELETE FROM pending_2fa WHERE username = ?", [username]);
     const sqlUpdateIP = "UPDATE users SET last_ip = ? WHERE username = ?";
     db.query(sqlUpdateIP, [ip, username]);
-
-    db.query("DELETE FROM pending_2fa WHERE username = ?", [username]);
 
     const sqlUser = "SELECT role FROM users WHERE username = ?";
     db.query(sqlUser, [username], (err, result) => {
