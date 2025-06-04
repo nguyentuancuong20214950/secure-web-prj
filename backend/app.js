@@ -13,6 +13,7 @@ const passport = require("passport");
 const multer = require("multer");
 const path = require("path");
 const rateLimit = require("express-rate-limit");
+require("./auth");
 const userrouter = require("./routes/user.js");
 const adminrouter = require("./routes/adminrouter.js");
 const checkout = require("./routes/checkout.js");
@@ -51,6 +52,13 @@ const limiter = rateLimit({
 });
 
 app.use(limiter);
+app.use(express.json({ limit: "10kb" }));
+app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ Error: "Something went wrong!" });
+});
 
 function isLoggedIn(req, res, next) {
   req.user ? next() : res.sendStatus(401);
@@ -71,14 +79,18 @@ const authMiddleware = (req, res, next) => {
     return res.status(401).json({ Error: "Invalid token" });
   }
 
-  const username = decoded.username;
+  const { username, tokenVersion, ip: tokenIP, ua: tokenUA } = decoded;
 
-  const sqlCheck = `SELECT last_activity FROM user_sessions WHERE username = ? LIMIT 1`;
+  const sqlCheck = `SELECT last_activity, token_version FROM user_sessions WHERE username = ? LIMIT 1`;
   db.query(sqlCheck, [username], (err, results) => {
     if (err) return res.status(500).json({ Error: "Database error" });
 
     if (results.length === 0) {
       return res.status(401).json({ Error: "Session not found" });
+    }
+
+    if (req.ip !== tokenIP || req.get("User-Agent") !== tokenUA) {
+      return res.status(401).json({ Error: "Session hijacking detected" });
     }
 
     const lastActivity = new Date(results[0].last_activity);
@@ -89,6 +101,10 @@ const authMiddleware = (req, res, next) => {
       return res
         .status(401)
         .json({ Error: "Session expired due to inactivity" });
+    }
+
+    if (results[0].token_version !== tokenVersion) {
+      return res.status(401).json({ Error: "Token invalidated" });
     }
 
     const sqlUpdate = `UPDATE user_sessions SET last_activity = NOW() WHERE username = ?`;
@@ -132,7 +148,7 @@ app.post("/login", csrfProtection, async (req, res) => {
         if (err)
           return res.status(500).json({ Error: "Internal server error" });
 
-        await send2FACode(user.email, code);
+        await sendVerificationEmail(user.email, code);
         return res.status(200).json({ Status: "2FA required", step: "verify" });
       });
     } else {
@@ -141,20 +157,29 @@ app.post("/login", csrfProtection, async (req, res) => {
                                 ON DUPLICATE KEY UPDATE last_activity = NOW()`;
       db.query(sqlInsertSession, [username]);
 
-      const token = jwt.sign(
-        { username, userType: user.role },
-        process.env.TOKEN_SECRET,
-        {
-          expiresIn: "1800s",
-        }
-      );
+      const sqlVersion =
+        "SELECT token_version FROM user_sessions WHERE username = ?";
+      db.query(sqlVersion, [username], (err, result) => {
+        const tokenVersion = result.length > 0 ? result[0].token_version : 1;
+        const token = jwt.sign(
+          {
+            username,
+            userType: user.role,
+            tokenVersion,
+            ip: req.ip,
+            ua: req.get("User-Agent"),
+          },
+          process.env.TOKEN_SECRET,
+          { expiresIn: "1800s" }
+        );
 
-      res.cookie("access-token", token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "strict",
+        res.cookie("access-token", token, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "strict",
+        });
+        return res.json({ Status: "Success" });
       });
-      return res.json({ Status: "Success" });
     }
   });
 });
@@ -173,8 +198,9 @@ app.post("/register", csrfProtection, async (req, res) => {
   const v1 = USER_REGEX.test(req.body.username.toString());
   const v2 = PWD_REGEX.test(req.body.password.toString());
   if (!v1 || !v2) {
-    setErrMsg("Invalid username/password format.");
-    return;
+    return res
+      .status(400)
+      .json({ Error: "Invalid username or password format" });
   }
 
   const sql =
@@ -213,12 +239,96 @@ app.post("/register", csrfProtection, async (req, res) => {
           });
           return res.status(500).send("Internal server error");
         }
-        logger.info(
-          `User ${req.body.username} has registered in successfully.` //@to-do: xử lí email verification
+        const verificationCode = Math.floor(
+          100000 + Math.random() * 900000
+        ).toString();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+        const sqlInsertVerification = `INSERT INTO email_verification (username, code, expires_at) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE code = VALUES(code), expires_at = VALUES(expires_at)`;
+        db.query(
+          sqlInsertVerification,
+          [req.body.username, verificationCode, expiresAt],
+          async (err) => {
+            if (err) {
+              logger.error("Error storing email verification code", {
+                error: err,
+                ip: req.ip,
+                userAgent: req.get("User-Agent"),
+                url: req.originalUrl,
+                timestamp: new Date().toISOString(),
+              });
+              return res.status(500).send("Internal server error");
+            }
+
+            await sendVerificationEmail(req.body.email, verificationCode);
+            logger.info(`Verification code sent to ${req.body.email}`);
+          }
         );
         res.send({ Status: "Success" });
       });
     });
+  });
+});
+
+async function sendVerificationEmail(email, code) {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.EMAIL_SENDER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  const mailOptions = {
+    from: process.env.EMAIL_SENDER,
+    to: email,
+    subject: "Verify your email",
+    text: `Your verification code is: ${code}`,
+  };
+
+  await transporter.sendMail(mailOptions);
+}
+
+app.post("/verify-email", csrfProtection, async (req, res) => {
+  const { username, code } = req.body;
+  const MAX_ATTEMPTS = 5;
+
+  if (!username || !code) {
+    return res.status(400).json({ Error: "Missing username or code" });
+  }
+
+  const sql = `SELECT * FROM email_verification WHERE username = ?`;
+  db.query(sql, [username], (err, results) => {
+    if (err) return res.status(500).json({ Error: "Database error" });
+
+    if (results.length === 0) {
+      return res.status(400).json({ Error: "No verification code found" });
+    }
+
+    const record = results[0];
+
+    if (
+      new Date(record.expires_at) < new Date() ||
+      record.attempts >= MAX_ATTEMPTS
+    ) {
+      db.query("DELETE FROM email_verification WHERE username = ?", [username]);
+      return res
+        .status(400)
+        .json({ Error: "Verification code expired or too many attempts" });
+    }
+
+    if (record.code !== code) {
+      db.query(
+        "UPDATE email_verification SET attempts = attempts + 1 WHERE username = ?",
+        [username]
+      );
+      return res.status(400).json({ Error: "Invalid verification code" });
+    }
+
+    const sqlActivate = "UPDATE users SET is_verified = 1 WHERE username = ?";
+    db.query(sqlActivate, [username]);
+    db.query("DELETE FROM email_verification WHERE username = ?", [username]);
+
+    return res.json({ Status: "Email verified successfully" });
   });
 });
 
@@ -233,8 +343,9 @@ app.post("/verify-2fa", csrfProtection, (req, res) => {
     WHERE username = ? AND code = ? AND ip_address = ? AND expires_at > NOW()
   `;
   db.query(sql, [username, code, ip], (err, results) => {
-    if (err || results.length === 0)
+    if (err || results.length === 0) {
       return res.status(400).json({ Error: "Invalid or expired code" });
+    }
 
     const sqlUpdateIP = "UPDATE users SET last_ip = ? WHERE username = ?";
     db.query(sqlUpdateIP, [ip, username]);
@@ -243,43 +354,67 @@ app.post("/verify-2fa", csrfProtection, (req, res) => {
 
     const sqlUser = "SELECT role FROM users WHERE username = ?";
     db.query(sqlUser, [username], (err, result) => {
-      if (err || result.length === 0)
+      if (err || result.length === 0) {
         return res.status(500).json({ Error: "Internal server error" });
+      }
 
-      const sqlInsertSession = `INSERT INTO user_sessions (username, last_activity)
-                                VALUES (?, NOW())
-                                ON DUPLICATE KEY UPDATE last_activity = NOW()`;
+      const role = result[0].role;
+
+      const sqlInsertSession = `
+        INSERT INTO user_sessions (username, last_activity)
+        VALUES (?, NOW())
+        ON DUPLICATE KEY UPDATE last_activity = NOW()
+      `;
       db.query(sqlInsertSession, [username]);
 
-      const token = jwt.sign(
-        { username, userType: result[0].role },
-        process.env.TOKEN_SECRET,
-        {
-          expiresIn: "1800s",
+      const sqlVersion = `
+        SELECT token_version FROM user_sessions WHERE username = ?
+      `;
+      db.query(sqlVersion, [username], (err, versionResult) => {
+        if (err) {
+          return res.status(500).json({ Error: "Token version query failed" });
         }
-      );
 
-      res.cookie("access-token", token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: "strict",
+        const tokenVersion =
+          versionResult.length > 0 ? versionResult[0].token_version : 1;
+
+        const token = jwt.sign(
+          {
+            username,
+            userType: role,
+            tokenVersion,
+            ip: req.ip,
+            ua: req.get("User-Agent"),
+          },
+          process.env.TOKEN_SECRET,
+          { expiresIn: "1800s" }
+        );
+
+        res.cookie("access-token", token, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "strict",
+        });
+
+        return res.json({ Status: "2FA success" });
       });
-      return res.json({ Status: "2FA success" });
     });
   });
 });
 
-app.post("/logout", csrfProtection, (req, res) => {
+app.post("/logout", authMiddleware, csrfProtection, (req, res) => {
   console.log(req.body);
   const { token } = req.body;
   refreshTokens = refreshTokens.filter((t) => t !== token);
   res.send("Logout successful");
 });
 
-app.get("/logout", (req, res) => {
+app.get("/logout", authMiddleware, csrfProtection, (req, res) => {
   res.clearCookie("access-token");
-  const sql = `DELETE FROM user_sessions WHERE username = ?`;
-  db.query(sql, req.body.username); //@to-do: verify mọi thứ ở req body để tránh logout của người khác
+  const sql1 = `UPDATE user_sessions SET token_version = token_version + 1 WHERE username = ?`;
+  db.query(sql1, [req.username]);
+  const sql2 = `DELETE FROM user_sessions WHERE username = ?`;
+  db.query(sql2, [req.username]);
   return res.json({ Status: "Success" });
 });
 
@@ -406,24 +541,39 @@ app.post("/order", csrfProtection, authMiddleware, async (req, res) => {
 
 app.post("/feedback", csrfProtection, authMiddleware, async (req, res) => {
   const username = req.username;
-  const request = req.body;
-  const values = [username, request];
-  const sql = "INSERT INTO feedbacks (user, request) VALUES (?, ?)";
-  db.query(sql, values, (err, result) => {
+  let request = req.body?.request?.toString().trim();
+
+  if (!request || request.length < 5 || request.length > 1000) {
+    return res
+      .status(400)
+      .json({ Error: "Feedback must be 5–1000 characters long." });
+  }
+
+  request = xss(request);
+
+  const checkSql = ` SELECT COUNT(*) AS count FROM feedbacks WHERE user = ? AND DATE(created_at) = CURDATE()`;
+  db.query(checkSql, [username], (err, results) => {
     if (err) {
-      return res.status(500).json({ Error: "Internal server error" });
+      return res.status(500).json({ Error: "Database error" });
     }
-    logger.info(`Feedback sent.`);
-    return res.json({ Status: "Success" });
+
+    if (results[0].count >= 5) {
+      return res.status(429).json({ Error: "Feedback limit reached." });
+    }
+
+    const insertSql = `INSERT INTO feedbacks (user, request, created_at) VALUES (?, ?, NOW())`;
+    db.query(insertSql, [username, request], (err, result) => {
+      if (err) {
+        return res.status(500).json({ Error: "Database error" });
+      }
+      logger.info(`Feedback sent by ${username}.`);
+      return res.json({ Status: "Success" });
+    });
   });
-  //@todo:
-  //  . giới hạn request length
-  //  . giới hạn số lượng feedback user có thể gửi/ngày
-  //  . xss/sql protection
 });
 
 app.get("/order", csrfProtection, authMiddleware, async (req, res) => {
-  const username = req.username; // Assuming username is set by authMiddleware
+  const username = req.username;
   console.log(username);
   if (username === "admin") {
     const sql = "SELECT * FROM orders";
@@ -448,8 +598,56 @@ app.get("/order", csrfProtection, authMiddleware, async (req, res) => {
   }
 });
 
+app.post("/request_password_reset", csrfProtection, (req, res) => {
+  const username = req.body.username;
+
+  const sqlCheck = `
+    SELECT created_at FROM password_reset_requests
+    WHERE username = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)
+  `;
+  db.query(sqlCheck, [username], (err, results) => {
+    if (err) return res.status(500).json({ Error: "Database error" });
+
+    if (results.length > 0) {
+      return res
+        .status(429)
+        .json({ Error: "You can only request once per hour" });
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    const insertOTP = `
+      INSERT INTO password_reset_otp (username, code, expires_at, attempts)
+      VALUES (?, ?, ?, 0)
+      ON DUPLICATE KEY UPDATE code = VALUES(code), expires_at = VALUES(expires_at), attempts = 0
+    `;
+
+    const insertLog = `
+      INSERT INTO password_reset_requests (username, created_at)
+      VALUES (?, NOW())
+    `;
+
+    const getEmailSql = `SELECT email FROM users WHERE username = ?`;
+    db.query(getEmailSql, [username], async (err, results) => {
+      if (err || results.length === 0)
+        return res.status(500).json({ Error: "User not found" });
+
+      const email = results[0].email;
+
+      db.query(insertOTP, [username, code, expiresAt], async (err) => {
+        if (err) return res.status(500).json({ Error: "Failed to store OTP" });
+
+        db.query(insertLog, [username]);
+        await sendVerificationEmail(email, code);
+        return res.json({ Status: "OTP sent to email" });
+      });
+    });
+  });
+});
+
 app.post(
-  "/change_password",
+  "/change_password_loggedin",
   csrfProtection,
   authMiddleware,
   async (req, res) => {
@@ -464,6 +662,7 @@ app.post(
         url: req.originalUrl,
         timestamp: new Date().toISOString(),
       });
+      setLoading(false);
       return;
     }
 
@@ -522,19 +721,6 @@ app.post(
                     .status(500)
                     .json({ Error: "Internal server error" });
                 }
-
-                if (hash == currentPassword) {
-                  logger.warn("New password is same as current password", {
-                    ip: req.ip,
-                    userAgent: req.get("User-Agent"),
-                    url: req.originalUrl,
-                    timestamp: new Date().toISOString(),
-                  });
-                  return res.status(400).json({
-                    Error:
-                      "New password must be different from the current one.",
-                  });
-                }
                 const sqlUpdate =
                   "UPDATE users SET password = ? WHERE username = ?";
                 db.query(sqlUpdate, [hash, username], (err, result) => {
@@ -575,3 +761,60 @@ app.post(
     });
   }
 );
+
+app.post("/reset_password_after_otp", csrfProtection, async (req, res) => {
+  const { username, otp, newPassword } = req.body;
+  const MAX_ATTEMPTS = 5;
+
+  if (!username || !otp || !newPassword) {
+    return res.status(400).json({ Error: "Missing input" });
+  }
+
+  if (!PWD_REGEX.test(newPassword)) {
+    return res.status(400).json({ Error: "Invalid password format" });
+  }
+
+  const sqlSelectOtp = "SELECT * FROM password_reset_otp WHERE username = ?";
+  db.query(sqlSelectOtp, [username], (err, results) => {
+    if (err || results.length === 0) {
+      return res.status(400).json({ Error: "No OTP found" });
+    }
+
+    const record = results[0];
+    if (
+      record.attempts >= MAX_ATTEMPTS ||
+      new Date(record.expires_at) < new Date()
+    ) {
+      db.query("DELETE FROM password_reset_otp WHERE username = ?", [username]);
+      return res
+        .status(400)
+        .json({ Error: "OTP expired or too many attempts" });
+    }
+
+    if (record.code !== otp) {
+      db.query(
+        "UPDATE password_reset_otp SET attempts = attempts + 1 WHERE username = ?",
+        [username]
+      );
+      return res.status(400).json({ Error: "Invalid OTP" });
+    }
+
+    bcrypt.hash(newPassword, saltRounds, (err, hash) => {
+      if (err) return res.status(500).json({ Error: "Error hashing password" });
+
+      const sqlUpdate = "UPDATE users SET password = ? WHERE username = ?";
+      db.query(sqlUpdate, [hash, username], (err) => {
+        if (err) return res.status(500).json({ Error: "Database error" });
+
+        db.query("DELETE FROM password_reset_otp WHERE username = ?", [
+          username,
+        ]);
+        db.query(
+          "UPDATE user_sessions SET token_version = token_version + 1 WHERE username = ?",
+          [username]
+        );
+        return res.json({ Status: "Password reset successfully" });
+      });
+    });
+  });
+});
