@@ -17,14 +17,13 @@ const Login = () => {
   const [user, setUser] = useState('');
   const [pwd, setPwd] = useState('');
   const [code, setCode] = useState('');
-  const [step, setStep] = useState('login'); 
+  const [step, setStep] = useState('login');
   const [csrfToken, setCsrfToken] = useState('');
   const dispatch = useDispatch();
   const navigateTo = useNavigate();
   const { loading } = useSelector((state) => state.user);
   const [loginStatus, setLoginStatus] = useState('');
   const [statusHolder, setStatusHolder] = useState('message');
-  
 
   useEffect(() => {
     const fetchCsrfToken = async () => {
@@ -51,8 +50,9 @@ const Login = () => {
       });
 
       if (res.data.Status === 'Success') {
+        localStorage.setItem('currentUser', user);  // Lưu vào localStorage
         dispatch(cartActions.clearCart());
-        dispatch(signInSuccess(user));
+        dispatch(signInSuccess({ username: user })); // Lưu vào Redux
         navigateTo(res.data.Role?.role === "user" ? '/' : '/dashboard');
         window.location.reload(true);
       } else if (res.data.Status === '2FA required' && res.data.step === 'verify') {
@@ -85,7 +85,8 @@ const Login = () => {
       });
 
       if (res.data.Status === '2FA success') {
-        dispatch(signInSuccess(user));
+        localStorage.setItem('currentUser', user); // Lưu sau khi xác thực thành công
+        dispatch(signInSuccess({ username: user }));
         navigateTo('/');
         window.location.reload(true);
       } else {
