@@ -22,118 +22,188 @@ const logger = winston.createLogger({
 
 const adminrouter = express.Router();
 
+// adminrouter.post("/login", csrfProtection, async (req, res) => {
+//   const v1 = USER_REGEX.test(req.body.username);
+//   const v2 = PWD_REGEX.test(req.body.password);
+//   if (!v1 || !v2) {
+//     setErrMsg("Invalid Entry");
+//     return;
+//   }
+
+//   const sql = "SELECT * FROM users WHERE username = ?";
+//   const sqlVersion =
+//         "SELECT token_version FROM user_sessions WHERE username = ?";
+//   db.query(sql, [req.body.username], (err, results) => {
+//     if (err) {
+//       logger.error("Error comparing username:", err);
+//       return res.json({ Error: err });
+//     }
+//     if (results.length > 0) {
+//       console.log(results);
+//       bcrypt.compare(
+//         req.body.password.toString(),
+//         results[0].password,
+//         (err, response) => {
+//           console.log(response);
+//           if (err) {
+//             logger.error("Error comparing passwords:", err);
+//             return res.json({ Error: "Invalid1 username or password" });
+//           }
+//           if (response) {
+//             const username = results[0].username;
+//             const role = results[0].role;
+//             if (role == "admin") {
+//               logger.info(
+//                 `User ${username} has logged in successfully as admin.`
+//               );
+//               db.query(sqlVersion, [username], (err, versionResult) => {
+//                 if (err) {
+//                   return res
+//                     .status(500)
+//                     .json({ Error: "Token version query failed" });
+//                 }
+
+//                 const tokenVersion =
+//                   versionResult.length > 0 ? versionResult[0].token_version : 1;
+//                 const token = jwt.sign(
+//                   {
+//                     username,
+//                     userType: role,
+//                     tokenVersion,
+//                     ip: req.ip,
+//                     ua: req.get("User-Agent"),
+//                   },
+//                   process.env.TOKEN_SECRET,
+//                   { expiresIn: "1800s" }
+//                 );
+//                 res.cookie("access-token", token, {
+//                   httpOnly: true,
+//                   secure: true,
+//                 });
+//               });
+
+//               return res.json({
+//                 Status: "Success",
+//                 Role: { role },
+//                 token,
+//               });
+//             } else {
+//               logger.info(`User ${username} has logged in successfully.`);
+//               db.query(sqlVersion, [username], (err, versionResult) => {
+//                 if (err) {
+//                   return res
+//                     .status(500)
+//                     .json({ Error: "Token version query failed" });
+//                 }
+
+//                 const tokenVersion =
+//                   versionResult.length > 0 ? versionResult[0].token_version : 1;
+//                 const token = jwt.sign(
+//                   {
+//                     username,
+//                     userType: role,
+//                     tokenVersion,
+//                     ip: req.ip,
+//                     ua: req.get("User-Agent"),
+//                   },
+//                   process.env.TOKEN_SECRET,
+//                   { expiresIn: "1800s" }
+//                 );
+//               });
+//               res.cookie("access-token", token, {
+//                 httpOnly: true,
+//                 secure: true,
+//               });
+
+//               return res.json({
+//                 Status: "Success",
+//                 Role: { role },
+//                 token,
+//               });
+//             }
+//           } else {
+//             console.log("rres", response);
+//             return res.json({ Error: "Invalid2 username or password" });
+//           }
+//         }
+//       );
+//     } else {
+//       logger.warn("Login failed: invalid username or password", {
+//         ip: req.ip,
+//         userAgent: req.get("User-Agent"),
+//         url: req.originalUrl,
+//         timestamp: new Date().toISOString(),
+//       });
+//       return res.json({ Error: "Login failed. Invalid username or password" });
+//     }
+//   });
+// });
+
 adminrouter.post("/login", csrfProtection, async (req, res) => {
-  const v1 = USER_REGEX.test(req.body.username);
-  const v2 = PWD_REGEX.test(req.body.password);
+  const { username, password } = req.body;
+
+  const v1 = USER_REGEX.test(username);
+  const v2 = PWD_REGEX.test(password);
   if (!v1 || !v2) {
-    setErrMsg("Invalid Entry");
-    return;
+    return res.status(400).json({ Error: "Invalid Entry" });
   }
 
   const sql = "SELECT * FROM users WHERE username = ?";
-  db.query(sql, [req.body.username], (err, results) => {
+  const sqlVersion = "SELECT token_version FROM user_sessions WHERE username = ?";
+
+  db.query(sql, [username], (err, results) => {
     if (err) {
-      logger.error("Error comparing username:", err);
-      return res.json({ Error: err });
+      logger.error("Database error:", err);
+      return res.status(500).json({ Error: "Database error" });
     }
-    if (results.length > 0) {
-      console.log(results);
-      bcrypt.compare(
-        req.body.password.toString(),
-        results[0].password,
-        (err, response) => {
-          console.log(response);
-          if (err) {
-            logger.error("Error comparing passwords:", err);
-            return res.json({ Error: "Invalid1 username or password" });
-          }
-          if (response) {
-            const username = results[0].username;
-            const role = results[0].role;
-            if (role == "admin") {
-              logger.info(
-                `User ${username} has logged in successfully as admin.`
-              );
-              db.query(sqlVersion, [username], (err, versionResult) => {
-                if (err) {
-                  return res
-                    .status(500)
-                    .json({ Error: "Token version query failed" });
-                }
 
-                const tokenVersion =
-                  versionResult.length > 0 ? versionResult[0].token_version : 1;
-                const token = jwt.sign(
-                  {
-                    username,
-                    userType: role,
-                    tokenVersion,
-                    ip: req.ip,
-                    ua: req.get("User-Agent"),
-                  },
-                  process.env.TOKEN_SECRET,
-                  { expiresIn: "1800s" }
-                );
-                res.cookie("access-token", token, {
-                  httpOnly: true,
-                  secure: true,
-                });
-              });
+    if (results.length === 0) {
+      logger.warn("Login failed: invalid username");
+      return res.status(401).json({ Error: "Invalid username or password" });
+    }
 
-              return res.json({
-                Status: "Success",
-                Role: { role },
-                token,
-              });
-            } else {
-              logger.info(`User ${username} has logged in successfully.`);
-              db.query(sqlVersion, [username], (err, versionResult) => {
-                if (err) {
-                  return res
-                    .status(500)
-                    .json({ Error: "Token version query failed" });
-                }
+    const user = results[0];
 
-                const tokenVersion =
-                  versionResult.length > 0 ? versionResult[0].token_version : 1;
-                const token = jwt.sign(
-                  {
-                    username,
-                    userType: role,
-                    tokenVersion,
-                    ip: req.ip,
-                    ua: req.get("User-Agent"),
-                  },
-                  process.env.TOKEN_SECRET,
-                  { expiresIn: "1800s" }
-                );
-              });
-              res.cookie("access-token", token, {
-                httpOnly: true,
-                secure: true,
-              });
+    bcrypt.compare(password.toString(), user.password, (err, isMatch) => {
+      if (err || !isMatch) {
+        logger.warn("Login failed: incorrect password");
+        return res.status(401).json({ Error: "Invalid username or password" });
+      }
 
-              return res.json({
-                Status: "Success",
-                Role: { role },
-                token,
-              });
-            }
-          } else {
-            console.log("rres", response);
-            return res.json({ Error: "Invalid2 username or password" });
-          }
+      db.query(sqlVersion, [username], (err, versionResult) => {
+        if (err) {
+          logger.error("Token version query failed:", err);
+          return res.status(500).json({ Error: "Token version query failed" });
         }
-      );
-    } else {
-      logger.warn("Login failed: invalid username or password", {
-        ip: req.ip,
-        userAgent: req.get("User-Agent"),
-        url: req.originalUrl,
-        timestamp: new Date().toISOString(),
+
+        const tokenVersion =
+          versionResult.length > 0 ? versionResult[0].token_version : 1;
+
+        const token = jwt.sign(
+          {
+            username,
+            userType: user.role,
+            tokenVersion,
+            ip: req.ip,
+            ua: req.get("User-Agent"),
+          },
+          process.env.TOKEN_SECRET,
+          { expiresIn: "1800s" }
+        );
+
+        res.cookie("access-token", token, {
+          httpOnly: true,
+          secure: true,
+        });
+
+        logger.info(`User ${username} logged in as ${user.role}`);
+        return res.json({
+          Status: "Success",
+          Role: { role: user.role },
+          token,
+        });
       });
-      return res.json({ Error: "Login failed. Invalid username or password" });
-    }
+    });
   });
 });
 
