@@ -153,15 +153,29 @@ app.post("/login", csrfProtection, async (req, res) => {
         return res.status(200).json({ Status: "2FA required", step: "verify" });
       });
     } else {
-      const sqlInsertSession = `INSERT INTO user_sessions (username, last_activity)
-                                VALUES (?, NOW())
-                                ON DUPLICATE KEY UPDATE last_activity = NOW()`;
+      if (!user.last_ip) {
+        const sqlUpdateIP = "UPDATE users SET last_ip = ? WHERE username = ?";
+        db.query(sqlUpdateIP, [ip, username]);
+      }
+
+      const sqlInsertSession = `
+        INSERT INTO user_sessions (username, last_activity)
+        VALUES (?, NOW())
+        ON DUPLICATE KEY UPDATE last_activity = NOW()
+      `;
       db.query(sqlInsertSession, [username]);
 
-      const sqlVersion =
-        "SELECT token_version FROM user_sessions WHERE username = ?";
+      const sqlVersion = `
+        SELECT token_version FROM user_sessions WHERE username = ?
+      `;
       db.query(sqlVersion, [username], (err, result) => {
-        const tokenVersion = result.length > 0 ? result[0].token_version : 1;
+        if (err) {
+          return res.status(500).json({ Error: "Token version query failed" });
+        }
+
+        const tokenVersion =
+          result.length > 0 ? result[0].token_version : 1;
+
         const token = jwt.sign(
           {
             username,
