@@ -25,3 +25,5 @@
 {"level":"info","message":"User thanh has logged in successfully."}
 {"level":"info","message":"MySQL connected","timestamp":"2025-06-06T10:19:54.895Z"}
 {"level":"info","message":"User thanh logged in as user"}
+{"level":"info","message":"MySQL connected","timestamp":"2025-06-06T15:36:15.066Z"}
+{"level":"info","message":"User thanh logged in as user"}

@@ -1,5 +1,6 @@
--- Create fresh schema
-CREATE DATABASE IF NOT EXISTS food_order;
+-- Xóa và tạo lại database
+DROP DATABASE IF EXISTS food_order;
+CREATE DATABASE food_order;
 USE food_order;
 
 -- Users table
@@ -20,13 +21,14 @@ CREATE TABLE user_sessions (
     token_version INT DEFAULT 0
 );
 
--- 2FA pending table
+-- 2FA pending table (đã thêm cột attempts)
 CREATE TABLE pending_2fa (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL,
     code VARCHAR(6) NOT NULL,
     ip_address VARCHAR(45),
     expires_at DATETIME,
+    attempts INT DEFAULT 0,
     UNIQUE KEY unique_code_ip (username, ip_address)
 );
 
