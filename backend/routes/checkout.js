@@ -6,7 +6,13 @@ const winston = require("winston");
 const db = require("../utils/db.js");
 dotenv.config({ path: "./.env" });
 const app = express.Router();
-const csrfProtection = csurf({ cookie: true });
+const csrfProtection = csurf({
+  cookie: {
+    httpOnly: true,
+    secure: true,
+    sameSite: "strict",
+  },
+});
 
 const logger = winston.createLogger({
   level: "info",
@@ -79,12 +85,12 @@ app.post("/checkout", csrfProtection, async (req, res) => {
         });
 
         const transporter = nodemailer.createTransport({
-          service: "gmail",
-          port: 465,
+          host: "smtp.google.com",
+          port: 587,
           secure: true,
           auth: {
-            user: process.env.EMAIL,
-            pass: process.env.PASSWORD,
+            user: process.env.EMAIL_SENDER,
+            pass: process.env.EMAIL_PASS,
           },
         });
 
