@@ -6,7 +6,13 @@ const csurf = require("csurf");
 const router = express.Router();
 const winston = require("winston");
 const fs = require("fs");
-const csrfProtection = csurf({ cookie: true });
+const csrfProtection = csurf({
+  cookie: {
+    httpOnly: true,
+    secure: true,
+    sameSite: "strict",
+  },
+});
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -29,6 +35,26 @@ const logger = winston.createLogger({
 
 const upload = multer({
   storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png/;
+    const mimetype = filetypes.test(file.mimetype);
+    const extname = filetypes.test(
+      path.extname(file.originalname).toLowerCase()
+    );
+
+    if (file.originalname.length > 30) {
+      return cb(new Error("Error: Filename too long! (max 30 characters)"));
+    }
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb("Error: Images Only!");
+    }
+  },
 });
 
 router.post(
