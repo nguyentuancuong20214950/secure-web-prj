@@ -9,7 +9,9 @@ const TabsComponent = () => {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const response = await axios.get('http://localhost:5001/order');
+        const response = await axios.get('http://localhost:5001/order', {
+            withCredentials: true
+          });
         setOrders(response.data.orders);
       } catch (error) {
         console.error('Error fetching orders:', error);

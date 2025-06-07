@@ -25,17 +25,18 @@ const ProductCard = (props) => {
       <div className="product__content">
         <h5>
 
-        {user !== 'admin' ? ( // Check if user is not an admin
+        {user !== 'admin' ? (
           <Link to={`/foods/${id}`}>
-            <img className="product__img w-50" src={require(`../../../assets/image/${image}`)} alt={name} />
+            <img src={`/images/${image}`} alt={name} className="product__img w-50" />
             <div>{name}</div>
           </Link>
-        ) : 
-            <Link to={`../dashboard/foods/${id}`}>
-            <img className="product__img w-50" src={require(`../../../assets/image/${image}`)} alt={name} />
+        ) : (
+          <Link to={`../dashboard/foods/${id}`}>
+            <img src={`/images/${image}`} alt={name} className="product__img w-50" />
             <div>{name}</div>
           </Link>
-      }
+        )}
+
         </h5>
       </div>
       <div className="d-flex flex-column align-items-center justify-content-between">
