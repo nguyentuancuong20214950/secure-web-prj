@@ -32,6 +32,13 @@ CREATE TABLE pending_2fa (
     UNIQUE KEY unique_code_ip (username, ip_address)
 );
 
+-- Xóa pending 2FA sau khi hết hạn
+CREATE EVENT IF NOT EXISTS ev_clear_expired_2fa
+ON SCHEDULE EVERY 1 MINUTE
+DO
+  DELETE FROM pending_2fa
+  WHERE expires_at < NOW();
+
 -- Account information
 CREATE TABLE accountinfo (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -101,6 +108,13 @@ CREATE TABLE password_reset_otp (
     code VARCHAR(6) NOT NULL,
     expires_at DATETIME NOT NULL
 );
+
+-- Xóa OTP khôi phục mật khẩu sau khi hết hạn
+CREATE EVENT IF NOT EXISTS ev_clear_expired_password_otp
+ON SCHEDULE EVERY 1 MINUTE
+DO
+  DELETE FROM password_reset_otp
+  WHERE expires_at < NOW();
 
 -- Password reset requests
 CREATE TABLE password_reset_requests (
