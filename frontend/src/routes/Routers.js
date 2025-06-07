@@ -15,6 +15,7 @@ import Order from "../components/admin/Order";
 import Products from "../components/admin/Products";
 import ProductDetails from "../components/admin/ProductDetails";
 import Layout from "../components/Layout/Layout";
+import ForgotPassword from '../pages/ForgotPassword';
 
 const Routers = () => {
   return (
@@ -33,6 +34,7 @@ const Routers = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/discount" element={<Discount />} />
       <Route path="/AccountInfo" element={<AccountInfo />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
 
 
       {/* Add other routes under Admin layout if needed */}

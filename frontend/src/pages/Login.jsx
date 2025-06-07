@@ -50,7 +50,7 @@ const Login = () => {
       });
 
       if (res.data.Status === 'Success') {
-        const userObj = res.data.user || { username: user }; // fallback nếu backend chưa gửi user object
+        const userObj = res.data.user || { username: user }; 
         localStorage.setItem('currentUser', JSON.stringify(userObj));
         dispatch(cartActions.clearCart());
         dispatch(signInSuccess(userObj));
@@ -168,6 +168,7 @@ const Login = () => {
                 </>
               )}
             </form>
+            <p><Link to="/forgot-password">Forgot your password?</Link></p>
             <Link to="/register">Can't sign in? Create account</Link>
           </Col>
         </Row>
