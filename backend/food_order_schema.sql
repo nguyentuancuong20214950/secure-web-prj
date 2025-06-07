@@ -102,11 +102,11 @@ CREATE TABLE email_verification (
 );
 
 -- Password reset OTP table
-CREATE TABLE password_reset_otp (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    email VARCHAR(100) NOT NULL,
-    code VARCHAR(6) NOT NULL,
-    expires_at DATETIME NOT NULL
+CREATE TABLE IF NOT EXISTS password_reset_otp (
+  username VARCHAR(255) PRIMARY KEY,
+  code VARCHAR(10) NOT NULL,
+  expires_at DATETIME NOT NULL,
+  attempts INT DEFAULT 0
 );
 
 -- Xóa OTP khôi phục mật khẩu sau khi hết hạn (https://dev.mysql.com/doc/refman/5.7/en/create-event.html)
@@ -117,8 +117,9 @@ DO
   WHERE expires_at < NOW();
 
 -- Password reset requests
-CREATE TABLE password_reset_requests (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    email VARCHAR(100) NOT NULL,
-    requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS password_reset_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(255),
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
