@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import axios from '../utils/axiosInstance';
 import { Container, Row, Col } from 'reactstrap';
 import "../styles/register.css";
 
-const RECAPTCHA_SITEKEY = process.env.REACT_APP_CLIENT_SITE_KEY;
 
 const ChangePassword = () => {
   const [csrfToken, setCsrfToken] = useState('');
-  const [captchaToken, setCaptchaToken] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -46,7 +44,7 @@ const ChangePassword = () => {
     setLoading(true);
     console.log(csrfToken, currentPassword, newPassword)
     try {
-      const response = await axios.post('http://localhost:5001/change_password', {
+      const response = await axios.post('http://localhost:5001/change_password_loggedin', {
         currentPassword,newPassword},
         {
           headers: {

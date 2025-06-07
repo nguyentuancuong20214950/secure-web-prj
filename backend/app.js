@@ -744,8 +744,7 @@ app.post(
         url: req.originalUrl,
         timestamp: new Date().toISOString(),
       });
-      setLoading(false);
-      return;
+      return res.status(400).json({ Error: "Invalid password format" });
     }
 
     const sqlSelect = "SELECT password FROM users WHERE username = ?";
@@ -760,78 +759,8 @@ app.post(
         });
         return res.status(500).json({ Error: "Internal server error" });
       }
-      if (results.length > 0) {
-        bcrypt.compare(
-          currentPassword,
-          results[0].password,
-          (err, response) => {
-            if (err || !response) {
-              logger.warn("Invalid current password during password change", {
-                ip: req.ip,
-                userAgent: req.get("User-Agent"),
-                url: req.originalUrl,
-                timestamp: new Date().toISOString(),
-              });
-              return res
-                .status(400)
-                .json({ Error: "Invalid current password" });
-            }
-            bcrypt.genSalt(saltRounds, (err, salt) => {
-              if (err) {
-                logger.error("Error generating salt during password change", {
-                  error: err,
-                  ip: req.ip,
-                  userAgent: req.get("User-Agent"),
-                  url: req.originalUrl,
-                  timestamp: new Date().toISOString(),
-                });
-                return res.status(500).json({ Error: "Internal server error" });
-              }
-              bcrypt.hash(newPassword, salt, (err, hash) => {
-                if (err) {
-                  logger.error(
-                    "Error hashing new password during password change",
-                    {
-                      error: err,
-                      ip: req.ip,
-                      userAgent: req.get("User-Agent"),
-                      url: req.originalUrl,
-                      timestamp: new Date().toISOString(),
-                    }
-                  );
-                  return res
-                    .status(500)
-                    .json({ Error: "Internal server error" });
-                }
-                const sqlUpdate =
-                  "UPDATE users SET password = ? WHERE username = ?";
-                db.query(sqlUpdate, [hash, username], (err, result) => {
-                  if (err) {
-                    logger.error("Database error during password update", {
-                      error: err,
-                      ip: req.ip,
-                      userAgent: req.get("User-Agent"),
-                      url: req.originalUrl,
-                      timestamp: new Date().toISOString(),
-                    });
-                    return res
-                      .status(500)
-                      .json({ Error: "Internal server error" });
-                  }
-                  logger.info("Password updated successfully", {
-                    username,
-                    ip: req.ip,
-                    userAgent: req.get("User-Agent"),
-                    url: req.originalUrl,
-                    timestamp: new Date().toISOString(),
-                  });
-                  return res.json({ Status: "Password updated successfully" });
-                });
-              });
-            });
-          }
-        );
-      } else {
+
+      if (results.length === 0) {
         logger.warn("User not found during password change", {
           ip: req.ip,
           userAgent: req.get("User-Agent"),
@@ -840,6 +769,67 @@ app.post(
         });
         return res.status(404).json({ Error: "User not found" });
       }
+
+      bcrypt.compare(currentPassword, results[0].password, (err, response) => {
+        if (err || !response) {
+          logger.warn("Invalid current password during password change", {
+            ip: req.ip,
+            userAgent: req.get("User-Agent"),
+            url: req.originalUrl,
+            timestamp: new Date().toISOString(),
+          });
+          return res.status(400).json({ Error: "Invalid current password" });
+        }
+
+        bcrypt.genSalt(saltRounds, (err, salt) => {
+          if (err) {
+            logger.error("Error generating salt during password change", {
+              error: err,
+              ip: req.ip,
+              userAgent: req.get("User-Agent"),
+              url: req.originalUrl,
+              timestamp: new Date().toISOString(),
+            });
+            return res.status(500).json({ Error: "Internal server error" });
+          }
+
+          bcrypt.hash(newPassword, salt, (err, hash) => {
+            if (err) {
+              logger.error("Error hashing new password", {
+                error: err,
+                ip: req.ip,
+                userAgent: req.get("User-Agent"),
+                url: req.originalUrl,
+                timestamp: new Date().toISOString(),
+              });
+              return res.status(500).json({ Error: "Internal server error" });
+            }
+
+            const sqlUpdate = "UPDATE users SET password = ? WHERE username = ?";
+            db.query(sqlUpdate, [hash, username], (err, result) => {
+              if (err) {
+                logger.error("Database error during password update", {
+                  error: err,
+                  ip: req.ip,
+                  userAgent: req.get("User-Agent"),
+                  url: req.originalUrl,
+                  timestamp: new Date().toISOString(),
+                });
+                return res.status(500).json({ Error: "Internal server error" });
+              }
+
+              logger.info("Password updated successfully", {
+                username,
+                ip: req.ip,
+                userAgent: req.get("User-Agent"),
+                url: req.originalUrl,
+                timestamp: new Date().toISOString(),
+              });
+              return res.json({ Status: "Password updated successfully" });
+            });
+          });
+        });
+      });
     });
   }
 );
