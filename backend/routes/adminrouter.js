@@ -1,11 +1,12 @@
 const express = require("express");
-const con = require("../utils/db.js");
-const multer = require("multer");
-const path = require("path");
-const csurf = require("csurf");
-const router = express.Router();
+const db = require("../utils/db.js");
+const dotenv = require("dotenv");
 const winston = require("winston");
-const fs = require("fs");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const csurf = require("csurf");
+dotenv.config({ path: "./.env" });
+
 const csrfProtection = csurf({
   cookie: {
     httpOnly: true,
@@ -14,18 +15,10 @@ const csrfProtection = csurf({
   },
 });
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const directory = "../frontend/src/assets/image";
-    cb(null, directory);
-  },
-  filename: (req, file, cb) => {
-    cb(
-      null,
-      file.fieldname + "_" + Date.now() + path.extname(file.originalname)
-    );
-  },
-});
+const USER_REGEX = /^[a-z0-9]{3,23}$/;
+const PWD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@$&*()]).{8,24}$/;
+
+const refreshTokens = [];
 
 const logger = winston.createLogger({
   level: "info",
@@ -33,81 +26,102 @@ const logger = winston.createLogger({
   transports: [new winston.transports.File({ filename: "logs.log" })],
 });
 
-const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024,
-  },
-  fileFilter: (req, file, cb) => {
-    const filetypes = /jpeg|jpg|png/;
-    const mimetype = filetypes.test(file.mimetype);
-    const extname = filetypes.test(
-      path.extname(file.originalname).toLowerCase()
-    );
+const adminrouter = express.Router();
 
-    if (file.originalname.length > 30) {
-      return cb(new Error("Error: Filename too long! (max 30 characters)"));
-    }
+adminrouter.post("/login", csrfProtection, async (req, res) => {
+  const { username, password } = req.body;
 
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb("Error: Images Only!");
-    }
-  },
-});
-
-router.post(
-  "/addProduct",
-  csrfProtection,
-  upload.single("image"),
-  (req, res) => {
-    const sql = `INSERT INTO product
-    (name, price, category, image, description)  VALUES (?)`;
-
-    const values = [
-      req.body.productName,
-      req.body.price,
-      req.body.category,
-      req.file.filename,
-      req.body.description,
-    ];
-
-    con.query(sql, [values], (err, result) => {
-      console.log(result);
-      if (err) return res.json({ Status: false, Error: err });
-      logger.info(`Admin has added a product in successfully.`, {
-        timestamp: new Date().toISOString(),
-      });
-      return res.json({ Status: "Success" });
-    });
+  const v1 = USER_REGEX.test(username);
+  const v2 = PWD_REGEX.test(password);
+  if (!v1 || !v2) {
+    return res.status(400).json({ Error: "Invalid Entry" });
   }
-);
 
-router.get("/logout", (req, res) => {
-  res.clearCookie("access-token");
-  return res.json({ Status: "Success" });
-});
+  const sql = "SELECT * FROM users WHERE username = ?";
+  const sqlVersion =
+    "SELECT token_version FROM user_sessions WHERE username = ?";
 
-router.post("/addCoupon", csrfProtection, (req, res) => {
-  const { username, code, discount_type, discount_value, expiry_date } =
-    req.body;
-  const sql = `
-    INSERT INTO coupons (username, code, discount_type, discount_value, expiry_date)
-    VALUES (?, ?, ?, ?, ?)
-  `;
-  db.query(
-    sql,
-    [username, code, discount_type, discount_value, expiry_date],
-    (err, result) => {
-      if (err) {
-        return res
-          .status(500)
-          .json({ Error: "Failed to add coupon", detail: err });
-      }
-      return res.json({ Status: "Coupon added" });
+  db.query(sql, [username], (err, results) => {
+    if (err) {
+      logger.error("Database error:", err);
+      return res.status(500).json({ Error: "Database error" });
     }
-  );
+
+    if (results.length === 0) {
+      logger.warn("Login failed: invalid username");
+      return res.status(401).json({ Error: "Invalid username or password" });
+    }
+
+    const user = results[0];
+
+    bcrypt.compare(password.toString(), user.password, (err, isMatch) => {
+      if (err || !isMatch) {
+        logger.warn("Login failed: incorrect password");
+        return res.status(401).json({ Error: "Invalid username or password" });
+      }
+
+      db.query(sqlVersion, [username], (err, versionResult) => {
+        if (err) {
+          logger.error("Token version query failed:", err);
+          return res.status(500).json({ Error: "Token version query failed" });
+        }
+
+        const tokenVersion =
+          versionResult.length > 0 ? versionResult[0].token_version : 1;
+
+        const token = jwt.sign(
+          {
+            username,
+            userType: user.role,
+            tokenVersion,
+            ip: req.ip,
+            ua: req.get("User-Agent"),
+          },
+          process.env.TOKEN_SECRET,
+          { expiresIn: "1800s" }
+        );
+
+        res.cookie("access-token", token, {
+          httpOnly: true,
+          secure: true,
+        });
+
+        logger.info(`User ${username} logged in as ${user.role}`);
+        return res.json({
+          Status: "Success",
+          Role: { role: user.role },
+          token,
+        });
+      });
+    });
+  });
 });
 
-module.exports = router;
+adminrouter.get("/product", csrfProtection, async (req, res) => {
+  const sql = "SELECT * FROM product";
+
+  db.query(sql, (err, result) => {
+    if (err) return res.json({ Status: false, Error: err });
+    return res.json({ Status: "Success", products: result });
+  });
+});
+
+adminrouter.post("/checkoutCash", csrfProtection, async (req, res) => {
+  const { userId, cartItems, totalAmount } = req.body;
+  const products = JSON.stringify(cartItems);
+  const timestamp = new Date().toISOString();
+  const method = "Cash";
+
+  const sql =
+    "INSERT INTO orders (userid, products, method, total, timestamp) VALUES (?, ?, ?, ?, ?)";
+  const values = [userId, products, method, totalAmount, timestamp];
+  db.query(sql, values, (err, result) => {
+    if (err) return res.json({ Status: false, Error: err });
+    logger.info(`User ${req.body.username} has checked out in successfully.`, {
+      timestamp: new Date().toISOString(),
+    });
+    return res.json({ Status: "Success" });
+  });
+});
+
+module.exports = adminrouter;
