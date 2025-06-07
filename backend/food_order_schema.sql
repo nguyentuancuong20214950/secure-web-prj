@@ -32,7 +32,7 @@ CREATE TABLE pending_2fa (
     UNIQUE KEY unique_code_ip (username, ip_address)
 );
 
--- Xóa pending 2FA sau khi hết hạn
+-- Xóa pending 2FA sau khi hết hạn (https://dev.mysql.com/doc/refman/5.7/en/create-event.html)
 CREATE EVENT IF NOT EXISTS ev_clear_expired_2fa
 ON SCHEDULE EVERY 1 MINUTE
 DO
@@ -109,7 +109,7 @@ CREATE TABLE password_reset_otp (
     expires_at DATETIME NOT NULL
 );
 
--- Xóa OTP khôi phục mật khẩu sau khi hết hạn
+-- Xóa OTP khôi phục mật khẩu sau khi hết hạn (https://dev.mysql.com/doc/refman/5.7/en/create-event.html)
 CREATE EVENT IF NOT EXISTS ev_clear_expired_password_otp
 ON SCHEDULE EVERY 1 MINUTE
 DO
