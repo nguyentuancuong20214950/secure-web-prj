@@ -7,10 +7,16 @@ const jwt = require("jsonwebtoken");
 const csurf = require("csurf");
 dotenv.config({ path: "./.env" });
 
-const csrfProtection = csurf({ cookie: true });
+const csrfProtection = csurf({
+  cookie: {
+    httpOnly: true,
+    secure: true,
+    sameSite: "strict",
+  },
+});
 
 const USER_REGEX = /^[a-z0-9]{3,23}$/;
-const PWD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@$&*()]).{8,24}$/;
+const PWD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@$&*()]).{8,24}$/;
 
 const refreshTokens = [];
 
@@ -32,7 +38,8 @@ adminrouter.post("/login", csrfProtection, async (req, res) => {
   }
 
   const sql = "SELECT * FROM users WHERE username = ?";
-  const sqlVersion = "SELECT token_version FROM user_sessions WHERE username = ?";
+  const sqlVersion =
+    "SELECT token_version FROM user_sessions WHERE username = ?";
 
   db.query(sql, [username], (err, results) => {
     if (err) {
