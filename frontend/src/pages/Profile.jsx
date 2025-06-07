@@ -1,7 +1,7 @@
 import { Row, Col} from "reactstrap";
 import "../styles/register.css";
 import React, { useState, useEffect } from 'react';
-import axios from "axios";
+import axios from "../utils/axiosInstance";
 import profileValidation from '../utils/validation.js';
 
 const Profile = () => {

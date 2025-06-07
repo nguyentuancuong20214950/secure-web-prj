@@ -136,6 +136,7 @@ app.post("/login", csrfProtection, async (req, res) => {
     const match = await bcrypt.compare(password, user.password);
     if (!match) return res.status(401).json({ Error: "Invalid credentials" });
 
+    // Nếu IP thay đổi, yêu cầu xác thực 2FA
     if (user.last_ip && user.last_ip !== ip) {
       const code = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -153,11 +154,13 @@ app.post("/login", csrfProtection, async (req, res) => {
         return res.status(200).json({ Status: "2FA required", step: "verify" });
       });
     } else {
+      // Nếu chưa có last_ip thì cập nhật
       if (!user.last_ip) {
         const sqlUpdateIP = "UPDATE users SET last_ip = ? WHERE username = ?";
         db.query(sqlUpdateIP, [ip, username]);
       }
 
+      // Ghi lại phiên login
       const sqlInsertSession = `
         INSERT INTO user_sessions (username, last_activity)
         VALUES (?, NOW())
@@ -176,7 +179,8 @@ app.post("/login", csrfProtection, async (req, res) => {
         const tokenVersion =
           result.length > 0 ? result[0].token_version : 1;
 
-        const token = jwt.sign(
+        // Tạo access token (30 phút)
+        const accessToken = jwt.sign(
           {
             username,
             userType: user.role,
@@ -188,16 +192,38 @@ app.post("/login", csrfProtection, async (req, res) => {
           { expiresIn: "1800s" }
         );
 
-        res.cookie("access-token", token, {
+        // Tạo refresh token (7 ngày)
+        const refreshToken = jwt.sign(
+          {
+            username,
+            tokenVersion,
+            ip: req.ip,
+            ua: req.get("User-Agent"),
+          },
+          process.env.REFRESH_TOKEN_SECRET,
+          { expiresIn: "7d" }
+        );
+
+        // Gửi cookie
+        res.cookie("access-token", accessToken, {
           httpOnly: true,
           secure: true,
           sameSite: "strict",
         });
+
+        res.cookie("refresh-token", refreshToken, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "strict",
+          path: "/refresh-token",
+        });
+
         return res.json({ Status: "Success" });
       });
     }
   });
 });
+
 
 const saltRounds = 10;
 
@@ -415,7 +441,7 @@ app.post("/verify-2fa", csrfProtection, (req, res) => {
         const tokenVersion =
           versionResult.length > 0 ? versionResult[0].token_version : 1;
 
-        const token = jwt.sign(
+        const accessToken = jwt.sign(
           {
             username,
             userType: role,
@@ -427,10 +453,28 @@ app.post("/verify-2fa", csrfProtection, (req, res) => {
           { expiresIn: "1800s" }
         );
 
-        res.cookie("access-token", token, {
+        const refreshToken = jwt.sign(
+          {
+            username,
+            tokenVersion,
+            ip: req.ip,
+            ua: req.get("User-Agent"),
+          },
+          process.env.REFRESH_TOKEN_SECRET,
+          { expiresIn: "7d" }
+        );
+
+        res.cookie("access-token", accessToken, {
           httpOnly: true,
           secure: true,
           sameSite: "strict",
+        });
+
+        res.cookie("refresh-token", refreshToken, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "strict",
+          path: "/refresh-token",
         });
 
         return res.json({ Status: "2FA success" });
@@ -438,6 +482,7 @@ app.post("/verify-2fa", csrfProtection, (req, res) => {
     });
   });
 });
+
 
 app.post("/logout", authMiddleware, csrfProtection, (req, res) => {
   console.log(req.body);
@@ -851,6 +896,62 @@ app.post("/reset_password_after_otp", csrfProtection, async (req, res) => {
           [username]
         );
         return res.json({ Status: "Password reset successfully" });
+      });
+    });
+  });
+});
+
+app.post("/refresh-token", (req, res) => {
+  const refreshToken = req.cookies["refresh-token"];
+  if (!refreshToken) {
+    return res.status(401).json({ Error: "No refresh token provided" });
+  }
+
+  jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET, (err, payload) => {
+    if (err) {
+      return res.status(401).json({ Error: "Invalid refresh token" });
+    }
+
+    const { username, tokenVersion, ip, ua } = payload;
+
+    const sql = `
+      SELECT role FROM users WHERE username = ?
+    `;
+    const sqlVersion = `
+      SELECT token_version FROM user_sessions WHERE username = ?
+    `;
+
+    db.query(sqlVersion, [username], (err, result) => {
+      if (err || result.length === 0) {
+        return res.status(401).json({ Error: "Token version mismatch" });
+      }
+
+      const currentVersion = result[0].token_version;
+      if (currentVersion !== tokenVersion) {
+        return res.status(401).json({ Error: "Token version invalid" });
+      }
+
+      db.query(sql, [username], (err, roleResult) => {
+        if (err || roleResult.length === 0) {
+          return res.status(500).json({ Error: "User lookup failed" });
+        }
+
+        const role = roleResult[0].role;
+
+        // Tạo access token mới
+        const newAccessToken = jwt.sign(
+          { username, userType: role, tokenVersion, ip, ua },
+          process.env.TOKEN_SECRET,
+          { expiresIn: "1800s" } // 30 phút
+        );
+
+        res.cookie("access-token", newAccessToken, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "strict",
+        });
+
+        return res.json({ Status: "Token refreshed" });
       });
     });
   });

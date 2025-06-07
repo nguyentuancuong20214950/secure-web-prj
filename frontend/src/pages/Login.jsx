@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from "react-router-dom";
-import axios from 'axios';
+import axios from "../utils/axiosInstance";
 import Helmet from "../components/Helmet/Helmet";
 import CommonSection from "../components/UI/common-section/CommonSection";
 import { Container, Row, Col } from "reactstrap";
@@ -28,7 +28,7 @@ const Login = () => {
   useEffect(() => {
     const fetchCsrfToken = async () => {
       try {
-        const response = await axios.get('http://localhost:5001/csrf-token', { withCredentials: true });
+        const response = await axios.get('/csrf-token', { withCredentials: true });
         setCsrfToken(response.data.csrfToken);
       } catch (err) {
         setLoginStatus('Invalid access');
@@ -41,7 +41,7 @@ const Login = () => {
     e.preventDefault();
     dispatch(signInStart());
     try {
-      const res = await axios.post('http://localhost:5001/login', {
+      const res = await axios.post('/login', {
         username: user,
         password: pwd,
       }, {
@@ -50,9 +50,10 @@ const Login = () => {
       });
 
       if (res.data.Status === 'Success') {
-        localStorage.setItem('currentUser', user);  // Lưu vào localStorage
+        const userObj = res.data.user || { username: user }; // fallback nếu backend chưa gửi user object
+        localStorage.setItem('currentUser', JSON.stringify(userObj));
         dispatch(cartActions.clearCart());
-        dispatch(signInSuccess({ username: user })); // Lưu vào Redux
+        dispatch(signInSuccess(userObj));
         navigateTo(res.data.Role?.role === "user" ? '/' : '/dashboard');
         window.location.reload(true);
       } else if (res.data.Status === '2FA required' && res.data.step === 'verify') {
@@ -76,7 +77,7 @@ const Login = () => {
     setStatusHolder('message');
 
     try {
-      const res = await axios.post('http://localhost:5001/verify-2fa', {
+      const res = await axios.post('/verify-2fa', {
         username: user,
         code: code,
       }, {
@@ -85,8 +86,9 @@ const Login = () => {
       });
 
       if (res.data.Status === '2FA success') {
-        localStorage.setItem('currentUser', user); // Lưu sau khi xác thực thành công
-        dispatch(signInSuccess({ username: user }));
+        const userObj = res.data.user || { username: user };
+        localStorage.setItem('currentUser', JSON.stringify(userObj));
+        dispatch(signInSuccess(userObj));
         navigateTo('/');
         window.location.reload(true);
       } else {

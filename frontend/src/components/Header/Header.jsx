@@ -1,11 +1,11 @@
-import React, { useRef, useEffect, useState } from "react";
-import axios from 'axios';
+import React, { useRef, useEffect } from "react";
+import axios from "../../utils/axiosInstance";
 import { Container } from "reactstrap";
 import logo from "../../assets/images/res-logo.png";
 import { NavLink, Link, useNavigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { cartUiActions } from "../../store/shopping-cart/cartUiSlice";
-import { signOut } from "../../store/user/userSlice";
+import { signOut, signInSuccess } from "../../store/user/userSlice";
 import "../../styles/header.css";
 
 const nav__links = [
@@ -17,25 +17,48 @@ const nav__links = [
 
 const Header = () => {
   const currentUser = useSelector((state) => state.user.currentUser);
-  const [auth, setAuth] = useState(false);
-  const [userName, setUserName] = useState("");
   const menuRef = useRef();
   const headerRef = useRef();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const totalQuantity = useSelector((state) => state.cart.totalQuantity);
 
-  // Lấy user từ Redux hoặc localStorage
+  // 👇 Auto load currentUser from localStorage (if Redux is empty)
   useEffect(() => {
-    const storedUser = localStorage.getItem('currentUser');
-    if (currentUser || storedUser) {
-      setAuth(true);
-      setUserName(currentUser?.username || storedUser);
-    } else {
-      setAuth(false);
-      setUserName('');
+    if (!currentUser) {
+      const storedUser = localStorage.getItem('currentUser');
+      if (storedUser) {
+        try {
+          const parsedUser = JSON.parse(storedUser);
+          dispatch(signInSuccess(parsedUser));
+        } catch (err) {
+          console.error("Failed to parse user from localStorage", err);
+        }
+      }
     }
-  }, [currentUser]);
+  }, [currentUser, dispatch]);
+
+  const toggleMenu = () => menuRef.current?.classList.toggle("show__menu");
+  const closeMenu = () => menuRef.current?.classList.remove("show__menu");
+  const toggleCart = () => dispatch(cartUiActions.toggle());
+
+  const handleLogout = async () => {
+    try {
+      const res = await axios.get('http://localhost:5001/logout', { withCredentials: true });
+      if (res.data.Status === 'Success') {
+        localStorage.removeItem('currentUser');
+        dispatch(signOut());
+        navigate('/login');
+      } else {
+        console.log('Logout failed:', res.data.Error);
+      }
+    } catch (err) {
+      console.log('Logout failed:', err);
+    }
+  };
+
+  const handleLogo = () => navigate('/');
+  const goToAccount = () => navigate('/Accountinfo');
 
   useEffect(() => {
     const handleScroll = () => {
@@ -47,31 +70,6 @@ const Header = () => {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
-
-  const toggleMenu = () => menuRef.current?.classList.toggle("show__menu");
-  const closeMenu = () => menuRef.current?.classList.remove("show__menu");
-  const toggleCart = () => dispatch(cartUiActions.toggle());
-
-  const handleLogout = async () => {
-    try {
-      const res = await axios.get('http://localhost:5001/logout', { withCredentials: true });
-      if (res.data.Status === 'Success') {
-        localStorage.removeItem('currentUser');  // xóa localStorage
-        dispatch(signOut()); // reset Redux
-        setAuth(false);
-        setUserName('');
-        navigate('/login');
-        window.location.reload();
-      } else {
-        console.log('Logout failed:', res.data.Error);
-      }
-    } catch (err) {
-      console.log('Logout failed:', err);
-    }
-  };
-
-  const handleLogo = () => navigate('/');
-  const goToAccount = () => navigate('/Accountinfo');
 
   return (
     <header className="header" ref={headerRef}>
@@ -102,21 +100,21 @@ const Header = () => {
               <span className="cart__badge">{totalQuantity}</span>
             </span>
 
-            <span className="user d-flex align-items-center gap-2">
-              {auth ? (
-                <>
-                  <i className="ri-user-line" onClick={goToAccount} style={{ cursor: "pointer" }} />
-                  <p className="m-0" style={{ cursor: "pointer" }} onClick={goToAccount}>
-                    {userName}
-                  </p>
-                  <button onClick={handleLogout} className="btn btn-sm btn-outline-danger">Sign out</button>
-                </>
-              ) : (
+            {currentUser ? (
+              <span className="user d-flex align-items-center gap-2">
+                <i className="ri-user-line" onClick={goToAccount} style={{ cursor: "pointer" }} />
+                <p className="m-0" onClick={goToAccount} style={{ cursor: "pointer" }}>
+                  {currentUser.username}
+                </p>
+                <button onClick={handleLogout} className="btn btn-sm btn-outline-danger">Sign out</button>
+              </span>
+            ) : (
+              <span className="user">
                 <Link to="/login">
                   <i className="ri-user-line" />
                 </Link>
-              )}
-            </span>
+              </span>
+            )}
 
             <span className="mobile__menu" onClick={toggleMenu}>
               <i className="ri-menu-line"></i>
