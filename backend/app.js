@@ -1,7 +1,7 @@
 const express = require("express");
 const dotenv = require("dotenv");
 const cors = require("cors");
-const nodemailer = require('nodemailer');
+const nodemailer = require("nodemailer");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 const cookieParser = require("cookie-parser");
@@ -14,13 +14,15 @@ const passport = require("passport");
 const multer = require("multer");
 const path = require("path");
 const rateLimit = require("express-rate-limit");
-// require("./auth");
 const userrouter = require("./routes/user.js");
 const adminrouter = require("./routes/adminrouter.js");
 const checkout = require("./routes/checkout.js");
 const db = require("./utils/db.js");
+const crypto = require("crypto");
 
 const app = express();
+app.disable("x-powered-by");
+
 app.use(session({ secret: "cats", resave: false, saveUninitialized: true }));
 app.use(passport.initialize());
 app.use(passport.session());
@@ -34,7 +36,13 @@ app.use(
   })
 );
 
-const csrfProtection = csurf({ cookie: true });
+const csrfProtection = csurf({
+  cookie: {
+    httpOnly: true,
+    secure: true,
+    sameSite: "strict",
+  },
+});
 app.use(csrfProtection);
 
 app.use((req, res, next) => {
@@ -76,7 +84,7 @@ const authMiddleware = (req, res, next) => {
   let decoded;
   try {
     decoded = jwt.verify(token, process.env.TOKEN_SECRET);
-  } catch (err) {
+  } catch {
     return res.status(401).json({ Error: "Invalid token" });
   }
 
@@ -138,7 +146,7 @@ app.post("/login", csrfProtection, async (req, res) => {
 
     // Nếu IP thay đổi, yêu cầu xác thực 2FA
     if (user.last_ip && user.last_ip !== ip) {
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const code = crypto.randomInt(100000, 999999).toString();
       const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
       const sqlUpsert = `
@@ -176,8 +184,7 @@ app.post("/login", csrfProtection, async (req, res) => {
           return res.status(500).json({ Error: "Token version query failed" });
         }
 
-        const tokenVersion =
-          result.length > 0 ? result[0].token_version : 1;
+        const tokenVersion = result.length > 0 ? result[0].token_version : 1;
 
         // Tạo access token (30 phút)
         const accessToken = jwt.sign(
@@ -224,7 +231,6 @@ app.post("/login", csrfProtection, async (req, res) => {
   });
 });
 
-
 const saltRounds = 10;
 
 app.get("/csrf-token", (req, res) => {
@@ -233,7 +239,7 @@ app.get("/csrf-token", (req, res) => {
 
 const USER_REGEX = /^[a-z0-9]{3,23}$/;
 const PWD_REGEX =
-  /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+{}\[\]:;"'<>,.?/~\\-]).{8,32}$/;
+  /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+{}\]:;"'<>,.?/~\\-]).{8,32}$/;
 
 app.post("/register", csrfProtection, async (req, res) => {
   const v1 = USER_REGEX.test(req.body.username.toString());
@@ -280,9 +286,7 @@ app.post("/register", csrfProtection, async (req, res) => {
           });
           return res.status(500).send("Internal server error");
         }
-        const verificationCode = Math.floor(
-          100000 + Math.random() * 900000
-        ).toString();
+        const verificationCode = crypto.randomInt(100000, 999999).toString();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
         const sqlInsertVerification = `INSERT INTO email_verification (username, code, expires_at) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE code = VALUES(code), expires_at = VALUES(expires_at)`;
         db.query(
@@ -312,7 +316,9 @@ app.post("/register", csrfProtection, async (req, res) => {
 
 async function sendVerificationEmail(email, code) {
   const transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.google.com",
+    port: 587,
+    secure: true,
     auth: {
       user: process.env.EMAIL_SENDER,
       pass: process.env.EMAIL_PASS,
@@ -359,7 +365,12 @@ app.post("/verify-email", csrfProtection, async (req, res) => {
     }
 
     if (record.code !== code) {
-      console.log("Verification failed: wrong code. Provided:", code, "Expected:", record.code);
+      console.log(
+        "Verification failed: wrong code. Provided:",
+        code,
+        "Expected:",
+        record.code
+      );
       db.query(
         "UPDATE email_verification SET attempts = attempts + 1 WHERE username = ?",
         [username]
@@ -483,7 +494,6 @@ app.post("/verify-2fa", csrfProtection, (req, res) => {
   });
 });
 
-
 app.post("/logout", authMiddleware, csrfProtection, (req, res) => {
   console.log(req.body);
   const { token } = req.body;
@@ -552,7 +562,7 @@ app.post(
         .status(400)
         .json({ Error: "Mobile number should contain exactly 10 digits." });
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email)) {
       return res.status(400).json({ Error: "Email is invalid." });
     }
     if (!/\d/.test(address) || !/[A-Za-z]/.test(address)) {
@@ -696,7 +706,7 @@ app.post("/request_password_reset", csrfProtection, (req, res) => {
         .json({ Error: "You can only request once per hour" });
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    const code = crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
     const insertOTP = `
@@ -805,7 +815,8 @@ app.post(
               return res.status(500).json({ Error: "Internal server error" });
             }
 
-            const sqlUpdate = "UPDATE users SET password = ? WHERE username = ?";
+            const sqlUpdate =
+              "UPDATE users SET password = ? WHERE username = ?";
             db.query(sqlUpdate, [hash, username], (err, result) => {
               if (err) {
                 logger.error("Database error during password update", {
@@ -951,4 +962,3 @@ const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
-
