@@ -34,7 +34,29 @@ const storage = multer.diskStorage({
     cb(null, Date.now() + "_" + file.originalname);
   },
 });
-const upload = multer({ storage });
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+  },
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png/;
+    const mimetype = filetypes.test(file.mimetype);
+    const extname = filetypes.test(
+      path.extname(file.originalname).toLowerCase()
+    );
+
+    if (file.originalname.length > 30) {
+      return cb(new Error("Error: Filename too long! (max 30 characters)"));
+    }
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb("Error: Images Only!");
+    }
+  },
+});
 
 const adminrouter = express.Router();
 
