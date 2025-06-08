@@ -322,8 +322,8 @@ app.post("/register", csrfProtection, async (req, res) => {
 async function sendVerificationEmail(email, code) {
   const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
+    port: 465,
+    secure: true,
     auth: {
       user: process.env.EMAIL_SENDER,
       pass: process.env.EMAIL_PASS,
