@@ -1,26 +1,39 @@
-import React, { useState } from "react";
-
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { Container, Row, Col } from "reactstrap";
-
-import products from "../assets/fake-data/products";
 import ProductCard from "../components/UI/product-card/ProductCard";
 import Helmet from "../components/Helmet/Helmet";
 import ReactPaginate from "react-paginate";
 import "../styles/pagination.css";
 
 const Pizzas = () => {
+  const [products, setProducts] = useState([]);
   const [pageNumber, setPageNumber] = useState(0);
 
-  const searchedProduct = products;
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await axios.get("http://localhost:5001/auth/product");
+        const pizzaProducts = response.data.products.filter(
+          (item) => item.category === "Pizza"
+        );
+        setProducts(pizzaProducts);
+      } catch (error) {
+        console.error("Error fetching products:", error);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   const productPerPage = 4;
   const visitedPage = pageNumber * productPerPage;
-  const displayPage = searchedProduct.slice(
+  const displayPage = products.slice(
     visitedPage,
     visitedPage + productPerPage
   );
 
-  const pageCount = Math.ceil(searchedProduct.length / productPerPage);
+  const pageCount = Math.ceil(products.length / productPerPage);
 
   const changePage = ({ selected }) => {
     setPageNumber(selected);

@@ -7,7 +7,7 @@ import { Link } from "react-router-dom";
 const ProductCard = (props) => {
   const { id, name, price, image } = props.item;
   const dispatch = useDispatch();
-  const user = useSelector((state) => state.user.currentUser); 
+  const user = useSelector((state) => state.user.currentUser);
 
   const addToCart = () => {
     dispatch(
@@ -15,37 +15,31 @@ const ProductCard = (props) => {
         id,
         name,
         price,
-        image
+        image,
       })
     );
   };
+
+  // Xác định đường dẫn đúng đến trang chi tiết sản phẩm
+  const detailLink = user?.role === "admin" ? `/dashboard/foods/${id}` : `/foods/${id}`;
 
   return (
     <div className="product__item d-flex flex-column justify-content-between">
       <div className="product__content">
         <h5>
-
-        {user !== 'admin' ? (
-          <Link to={`/foods/${id}`}>
-            <img src={`/images/${image}`} alt={name} className="product__img w-50" />
+          <Link to={detailLink}>
+          <img src={`http://localhost:5001/images/${image}`} alt={name} className="product__img w-50" />
             <div>{name}</div>
           </Link>
-        ) : (
-          <Link to={`../dashboard/foods/${id}`}>
-            <img src={`/images/${image}`} alt={name} className="product__img w-50" />
-            <div>{name}</div>
-          </Link>
-        )}
-
         </h5>
       </div>
       <div className="d-flex flex-column align-items-center justify-content-between">
-        <span className="product__price mb-2">{price} K </span>
-        {user !== 'admin' ? ( // Check if user is not an admin
+        <span className="product__price mb-2">{price} K</span>
+        {user?.role !== "admin" && (
           <button className="addTOCART__btn" onClick={addToCart}>
             Add to Cart
           </button>
-        ) : null}
+        )}
       </div>
     </div>
   );

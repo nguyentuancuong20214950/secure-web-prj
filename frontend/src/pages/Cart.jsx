@@ -67,7 +67,7 @@ const Tr = (props) => {
   return (
     <tr>
       <td className="text-center cart__img-box">
-        <img  src={require(`../assets/image/${image}`)} alt="product-image" />
+        <img  src={`http://localhost:5001/images/${image}`} alt="product-image" />
       </td>
       <td className="text-center">{name}</td>
       <td className="text-center">{price}K</td>

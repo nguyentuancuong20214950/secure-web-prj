@@ -150,7 +150,7 @@ const TabsComponent = () => {
                 {JSON.parse(order.products).map(product => (
                   <tr key={product.id}>
                     <td>{product.name}</td>
-                    <td><img src={require(`../../assets/image/${product.image}`)} alt={product.name} width="50" /></td>
+                    <td><img src={`http://localhost:5001/images/${product.image}`} alt={product.name} width="50" /></td>
                     <td>{product.price}K</td>
                     <td>{product.quantity}</td>
                     <td>{product.totalPrice}K</td>

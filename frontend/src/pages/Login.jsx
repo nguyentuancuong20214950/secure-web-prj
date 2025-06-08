@@ -50,12 +50,15 @@ const Login = () => {
       });
 
       if (res.data.Status === 'Success') {
-        const userObj = res.data.user || { username: user }; 
+        const userObj = {
+          username: user,
+          role: res.data.Role?.role || 'user'   
+        }; 
         localStorage.setItem('currentUser', JSON.stringify(userObj));
         dispatch(cartActions.clearCart());
         dispatch(signInSuccess(userObj));
-        navigateTo(res.data.Role?.role === "user" ? '/' : '/dashboard');
-        window.location.reload(true);
+        navigateTo(userObj.role === "user" ? '/home' : '/dashboard');
+        // window.location.reload(true);
       } else if (res.data.Status === '2FA required' && res.data.step === 'verify') {
         setStep('verify');
         setLoginStatus("Code is sent to your email. Please enter your code!");
@@ -86,11 +89,14 @@ const Login = () => {
       });
 
       if (res.data.Status === '2FA success') {
-        const userObj = res.data.user || { username: user };
-        localStorage.setItem('currentUser', JSON.stringify(userObj));
+        const userObj = {
+          username: user,
+          role: res.data.Role?.role || 'user'   
+        };
         dispatch(signInSuccess(userObj));
-        navigateTo('/');
-        window.location.reload(true);
+        localStorage.setItem('currentUser', JSON.stringify(userObj));
+        navigateTo(userObj.role === "user" ? '/home' : '/dashboard');
+        // window.location.reload(true);
       } else {
         dispatch(signInFailure(res.data));
         setLoginStatus('Invalid or expired code');

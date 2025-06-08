@@ -53,7 +53,7 @@ const FoodDetails = () => {
           <Row>
             <Col lg="4" md="4">
               <div className="product__main-img">
-                <img src={require(`../../assets/image/${image}`)} alt="" className="w-100" />
+                <img src={`http://localhost:5001/images/${image}`} alt="" className="w-100" />
               </div>
             </Col>
 

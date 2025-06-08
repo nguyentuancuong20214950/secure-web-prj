@@ -49,6 +49,7 @@ app.use((req, res, next) => {
   res.cookie("XSRF-TOKEN", req.csrfToken());
   next();
 });
+app.use('/images', express.static(path.join(__dirname, 'assets/images')));
 
 app.use("/auth", adminrouter);
 app.use("/auth", userrouter);
@@ -225,7 +226,11 @@ app.post("/login", csrfProtection, async (req, res) => {
           path: "/refresh-token",
         });
 
-        return res.json({ Status: "Success" });
+        return res.json({
+          Status: 'Success',
+          user: { username: user.username, role: user.role }, 
+          Role: { role: user.role }
+        });
       });
     }
   });
@@ -316,9 +321,9 @@ app.post("/register", csrfProtection, async (req, res) => {
 
 async function sendVerificationEmail(email, code) {
   const transporter = nodemailer.createTransport({
-    host: "smtp.google.com",
+    host: "smtp.gmail.com",
     port: 587,
-    secure: true,
+    secure: false,
     auth: {
       user: process.env.EMAIL_SENDER,
       pass: process.env.EMAIL_PASS,

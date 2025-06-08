@@ -1,5 +1,6 @@
 import React from "react";
-import { Routes, Route} from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
+
 import Home from "../pages/Home";
 import AllFoods from "../pages/AllFoods";
 import FoodDetails from "../pages/FoodDetails";
@@ -9,22 +10,21 @@ import Discount from "../pages/Contact";
 import Login from "../pages/Login";
 import Register from "../pages/Register";
 import AccountInfo from "../pages/AccountInfo";
-import Dashboard from "../components/admin/Dashboard";
+import ForgotPassword from "../pages/ForgotPassword";
+
+import AdminLayout from "../components/Layout/AdminLayout"; 
 import Product from "../components/admin/Product";
 import Order from "../components/admin/Order";
 import Products from "../components/admin/Products";
 import ProductDetails from "../components/admin/ProductDetails";
-import Layout from "../components/Layout/Layout";
-import ForgotPassword from '../pages/ForgotPassword';
+
+const DashboardHome = () => <div>Welcome, admin!</div>;
 
 const Routers = () => {
   return (
     <Routes>
-
-      {/* Add (find) suitable routes under Root layout if needed */}
+      {/* User routes */}
       <Route path="/" element={<Home />} />
-
-      {/* Add other routes under User layout if needed */} 
       <Route path="/home" element={<Home />} />
       <Route path="/menu" element={<AllFoods />} />
       <Route path="/foods/:id" element={<FoodDetails />} />
@@ -36,14 +36,14 @@ const Routers = () => {
       <Route path="/AccountInfo" element={<AccountInfo />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
 
-
-      {/* Add other routes under Admin layout if needed */}
-      <Route path="/dashboard/product" element={<Product />} />
-      <Route path="/dashboard/order" element={<Order />} />
-      <Route path="/dashboard/products" element={<Products />} />
-      <Route path="/dashboard/foods/:id" element={<ProductDetails />} />
-        {/* Add other nested routes under Dashboard if needed */}
-     
+      {/* Admin routes với layout kiểm tra role */}
+      <Route path="/dashboard" element={<AdminLayout />}>
+        <Route index element={<DashboardHome />} />
+        <Route path="product" element={<Product />} />
+        <Route path="order" element={<Order />} />
+        <Route path="products" element={<Products />} />
+        <Route path="foods/:id" element={<ProductDetails />} />
+      </Route>
     </Routes>
   );
 };

@@ -5,6 +5,8 @@ const winston = require("winston");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const csurf = require("csurf");
+const multer = require("multer");
+const path = require("path");
 dotenv.config({ path: "./.env" });
 
 const csrfProtection = csurf({
@@ -18,13 +20,21 @@ const csrfProtection = csurf({
 const USER_REGEX = /^[a-z0-9]{3,23}$/;
 const PWD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@$&*()]).{8,24}$/;
 
-const refreshTokens = [];
-
 const logger = winston.createLogger({
   level: "info",
   format: winston.format.json(),
   transports: [new winston.transports.File({ filename: "logs.log" })],
 });
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, path.join(__dirname, "../assets/images"));
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + "_" + file.originalname);
+  },
+});
+const upload = multer({ storage });
 
 const adminrouter = express.Router();
 
@@ -53,6 +63,11 @@ adminrouter.post("/login", csrfProtection, async (req, res) => {
     }
 
     const user = results[0];
+
+    if (user.role !== 'admin') {
+      logger.warn(`Unauthorized login attempt by non-admin: ${username}`);
+      return res.status(403).json({ Error: "Forbidden: Admins only" });
+    }
 
     bcrypt.compare(password.toString(), user.password, (err, isMatch) => {
       if (err || !isMatch) {
@@ -86,9 +101,10 @@ adminrouter.post("/login", csrfProtection, async (req, res) => {
           secure: true,
         });
 
-        logger.info(`User ${username} logged in as ${user.role}`);
+        logger.info(`Admin ${username} logged in successfully`);
         return res.json({
           Status: "Success",
+          user: { username: user.username, role: user.role }, // <-- dòng này cần có!
           Role: { role: user.role },
           token,
         });
@@ -99,7 +115,6 @@ adminrouter.post("/login", csrfProtection, async (req, res) => {
 
 adminrouter.get("/product", csrfProtection, async (req, res) => {
   const sql = "SELECT * FROM product";
-
   db.query(sql, (err, result) => {
     if (err) return res.json({ Status: false, Error: err });
     return res.json({ Status: "Success", products: result });
@@ -120,6 +135,22 @@ adminrouter.post("/checkoutCash", csrfProtection, async (req, res) => {
     logger.info(`User ${req.body.username} has checked out in successfully.`, {
       timestamp: new Date().toISOString(),
     });
+    return res.json({ Status: "Success" });
+  });
+});
+
+adminrouter.post("/addProduct", csrfProtection, upload.single("image"), (req, res) => {
+  const { productName, category, price, description } = req.body;
+  const image = req.file ? req.file.filename : null;
+
+  const sql = "INSERT INTO product (name, category, price, description, image) VALUES (?, ?, ?, ?, ?)";
+  const values = [productName, category, price, description, image];
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error("Error inserting product:", err);
+      return res.json({ Status: false, Error: err });
+    }
     return res.json({ Status: "Success" });
   });
 });
