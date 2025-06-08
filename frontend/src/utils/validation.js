@@ -9,7 +9,7 @@ const profileValidation = (values) => {
 
   if (!values.email) {
     errors.email = 'Email is required';
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
+  } else if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(values.email)) {
     errors.email = 'Email is invalid.';
   }
 
