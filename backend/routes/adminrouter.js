@@ -99,6 +99,7 @@ adminrouter.post("/login", csrfProtection, async (req, res) => {
         res.cookie("access-token", token, {
           httpOnly: true,
           secure: true,
+          sameSite: "strict",
         });
 
         logger.info(`Admin ${username} logged in successfully`);
