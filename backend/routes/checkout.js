@@ -67,7 +67,11 @@ app.post("/checkout", csrfProtection, async (req, res) => {
 
         const finalAmount = Math.max(0, totalAmount - discount);
 
-        db.query("UPDATE coupons SET is_used = TRUE WHERE id = ?", [coupon.id]);
+        db.query("UPDATE coupons SET is_used = TRUE WHERE id = ?", [coupon.id], (updateErr) => {
+          if (updateErr) return callback(updateErr);
+        callback(null, finalAmount, discount);
+          return callback(null, finalAmount, discount);
+        });
 
         callback(null, finalAmount, discount);
       });
