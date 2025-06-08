@@ -156,4 +156,25 @@ adminrouter.post("/addProduct", csrfProtection, upload.single("image"), (req, re
   });
 });
 
+adminrouter.post("/addCoupon", csrfProtection, (req, res) => {
+  const { username, code, discount_type, discount_value, expiry_date } =
+    req.body;
+  const sql = `
+    INSERT INTO coupons (username, code, discount_type, discount_value, expiry_date)
+    VALUES (?, ?, ?, ?, ?)
+  `;
+  db.query(
+    sql,
+    [username, code, discount_type, discount_value, expiry_date],
+    (err, result) => {
+      if (err) {
+        return res
+          .status(500)
+          .json({ Error: "Failed to add coupon", detail: err });
+      }
+      return res.json({ Status: "Coupon added" });
+    }
+  );
+});
+
 module.exports = adminrouter;
