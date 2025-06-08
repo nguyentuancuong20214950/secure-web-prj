@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Container, Row, Col } from 'reactstrap';
-import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Helmet from '../components/Helmet/Helmet';
 import CommonSection from '../components/UI/common-section/CommonSection';
@@ -11,13 +10,16 @@ import { AiFillCheckCircle } from "react-icons/ai";
 const Checkout = () => {
   const cartItems = useSelector((state) => state.cart.cartItems);
   const totalAmount = useSelector((state) => state.cart.totalAmount);
+  const currentUser = useSelector((state) => state.user.currentUser);
   const [csrfToken, setCsrfToken] = useState('');
-  const userId = useSelector((state) => state.user.currentUser);
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [loadingCash, setLoadingCash] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
-  const navigate = useNavigate();
+  const [couponCode, setCouponCode] = useState('');
+  const [discount, setDiscount] = useState(0);
+  const [finalAmount, setFinalAmount] = useState(totalAmount);
+  const [applyLoading, setApplyLoading] = useState(false);
+  const [couponMessage, setCouponMessage] = useState('');
 
   useEffect(() => {
     axios.get('http://localhost:5001/csrf-token')
@@ -29,21 +31,59 @@ const Checkout = () => {
       });
   }, []);
 
+  const applyCoupon = (e) => {
+    e.preventDefault();
+    setApplyLoading(true);
+    setCouponMessage('');
+    setError(false);
+
+    axios.post('http://localhost:5001/auth/checkout', {
+      username: currentUser?.username,
+      cartItems,
+      totalAmount,
+      couponCode,
+      _csrf: csrfToken,
+    },{
+      withCredentials: true
+    })
+      .then(response => {
+        if (response.data.status === 'Success') {
+          setDiscount(response.data.discount);
+          setFinalAmount(response.data.finalAmount);
+          setCouponMessage(`Áp dụng mã thành công! Giảm ${response.data.discount}K`);
+        } else {
+          setCouponMessage('Không áp dụng được mã.');
+          setFinalAmount(totalAmount);
+          setDiscount(0);
+        }
+      })
+      .catch(error => {
+        setCouponMessage('Mã giảm giá không hợp lệ hoặc đã hết hạn.');
+        setFinalAmount(totalAmount);
+        setDiscount(0);
+        console.error('Error applying coupon:', error);
+      })
+      .finally(() => {
+        setApplyLoading(false);
+      });
+  };
 
   const handleCheckout = (e) => {
     e.preventDefault();
     setLoading(true);
-    
+
     axios.post('http://localhost:5001/auth/checkout', {
-      userId,
+      username: currentUser?.username,
       cartItems,
       totalAmount,
+      couponCode,
       _csrf: csrfToken,
+    },{
+      withCredentials: true
     })
       .then(response => {
         if (response.data.status === 'Success') {
           setOrderSuccess(true);
-
         } else {
           setError(true);
         }
@@ -57,57 +97,16 @@ const Checkout = () => {
       });
   };
 
-  const handleCash = (e) => {
-    e.preventDefault();
-    setLoadingCash(true);
-
-    axios.post('http://localhost:5001/auth/checkoutCash', {
-      userId,
-      cartItems,
-      totalAmount,
-      _csrf: csrfToken,
-    })
-      .then(response => {
-        console.log(response.data.status
-        )
-        if (response.data.Status === 'Success') {
-          setOrderSuccess(true);
-
-        } else {
-          setError(true);
-        }
-      })
-      .catch(error => {
-        console.error('Error during checkout:', error);
-        setError(true);
-      })
-      .finally(() => {
-        setLoadingCash(false);
-      });
-    
-    setTimeout(() => {
-      setLoadingCash(false);
-    }, 1000); // 1 second delay
-  }
-
   if (orderSuccess) {
     return (
       <div className="checkoutMessage">
         <div className="checkoutTitleContainer">
           <AiFillCheckCircle className="checkoutIcon" />
           <h3>Thank you for your order!</h3>
-          
-          
         </div>
-        <h4>We are already sent order payment to your email. PLease verify!</h4>
-        <span>
-          Your order is being processing and will be served as fast as possible.
-        </span>
-        <br></br>
-        <span>
-          You can see order status detail in order history.
-        </span>
-
+        <h4>We have sent order confirmation to your email.</h4>
+        <span>Your order is being processed and will be served soon.</span><br />
+        <span>You can check your order status in your order history.</span>
       </div>
     );
   }
@@ -119,7 +118,7 @@ const Checkout = () => {
         <Container>
           <Row>
             <Col lg="12">
-              <h5 className="mb-5">Confirmation of your order</h5>
+              <h5 className="mb-5">Order Confirmation</h5>
               <table className="table table-borderless mb-5 align-middle">
                 <tbody>
                   {cartItems.map((item) => (
@@ -128,21 +127,31 @@ const Checkout = () => {
                 </tbody>
               </table>
               <div className="mt-4">
+                <h6>Tổng ban đầu: <span className="cart__subtotal">{totalAmount}</span>K</h6>
+                <div className="d-flex mb-3">
+                  <input
+                    className="form-control me-2"
+                    type="text"
+                    placeholder="Nhập mã giảm giá"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                  />
+                  <button onClick={applyCoupon} className="btn btn-secondary" disabled={applyLoading}>
+                    {applyLoading ? 'Đang áp dụng...' : 'Áp dụng mã'}
+                  </button>
+                </div>
+                {couponMessage && <p className="text-success">{couponMessage}</p>}
+                {discount > 0 && (
+                  <p>Giảm giá: <strong>{discount}K</strong></p>
+                )}
                 <h6>
-                  Total: 
-                  <span className="cart__subtotal">{totalAmount}</span>K
+                  Tổng phải thanh toán: <span className="cart__subtotal">{finalAmount}</span>K
                 </h6>
                 <p>Taxes already included</p>
-              
-                  <button className="addTOCart__btn mt-4" onClick={handleCash} disabled={loadingCash}>
-                    {loadingCash ? 'Processing...' : 'Thanh toán khi nhận hàng'}
-                  </button>
-                  
-                  <button className="addTOCart__btn mt-4" onClick={handleCheckout} disabled={loading}>
-                    {loading ? 'Processing...' : 'VNPay'}
-                  </button>
-                  
-                {error && <p className='text-red-700 mt-5'>Something went wrong!</p>}
+                <button className="addTOCart__btn mt-4" onClick={handleCheckout} disabled={loading}>
+                  {loading ? 'Processing...' : 'Thanh toán khi nhận hàng'}
+                </button>
+                {error && <p className='text-danger mt-4'>Đã xảy ra lỗi khi đặt hàng.</p>}
               </div>
             </Col>
           </Row>
@@ -153,11 +162,11 @@ const Checkout = () => {
 };
 
 const Tr = ({ item }) => {
-  const { id, image, name, price, quantity } = item;
+  const { image, name, price, quantity } = item;
   return (
     <tr>
       <td className="text-center cart__img-box">
-        <img src={require(`../assets/image/${image}`)} alt=""  />
+        <img src={`http://localhost:5001/images/${image}`} alt={name} width="50" />
       </td>
       <td className="text-center">{name}</td>
       <td className="text-center">{price}K</td>

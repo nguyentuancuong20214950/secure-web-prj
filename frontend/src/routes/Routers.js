@@ -16,6 +16,7 @@ import AdminLayout from "../components/Layout/AdminLayout";
 import Product from "../components/admin/Product";
 import Order from "../components/admin/Order";
 import Products from "../components/admin/Products";
+import AddCoupon from "../components/admin/AddCoupon";
 import ProductDetails from "../components/admin/ProductDetails";
 
 const DashboardHome = () => <div>Welcome, admin!</div>;
@@ -42,6 +43,7 @@ const Routers = () => {
         <Route path="product" element={<Product />} />
         <Route path="order" element={<Order />} />
         <Route path="products" element={<Products />} />
+        <Route path="addcoupon" element={<AddCoupon />} />
         <Route path="foods/:id" element={<ProductDetails />} />
       </Route>
     </Routes>

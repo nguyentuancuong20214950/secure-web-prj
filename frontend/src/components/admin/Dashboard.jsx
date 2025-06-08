@@ -81,6 +81,15 @@ export default function Dashboard() {
                 </Link>
               </li>
               <li className="w-100">
+                <Link
+                  to="/dashboard/addcoupon"
+                  className="nav-link px-0 align-middle"
+                >
+                  <i className="fs-5 bi-person ms-2"></i>
+                  <span className="ms-2 d-none d-sm-inline">Add Coupon</span>
+                </Link>
+              </li>
+              <li className="w-100">
                 <button
                   onClick={handleLogout}
                   className="nav-link px-0 align-middle btn btn-link text-start"

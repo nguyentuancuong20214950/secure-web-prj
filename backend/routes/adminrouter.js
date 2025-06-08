@@ -99,6 +99,7 @@ adminrouter.post("/login", csrfProtection, async (req, res) => {
         res.cookie("access-token", token, {
           httpOnly: true,
           secure: true,
+          sameSite: "strict",
         });
 
         logger.info(`Admin ${username} logged in successfully`);
@@ -143,6 +144,15 @@ adminrouter.post("/addProduct", csrfProtection, upload.single("image"), (req, re
   const { productName, category, price, description } = req.body;
   const image = req.file ? req.file.filename : null;
 
+  if (
+    typeof productName !== 'string' || productName.trim() === '' ||
+    typeof category !== 'string' || category.trim() === '' ||
+    isNaN(price) || Number(price) < 0 ||
+    typeof description !== 'string'
+  ) {
+    return res.json({ Status: false, Error: "Invalid input" });
+  }
+
   const sql = "INSERT INTO product (name, category, price, description, image) VALUES (?, ?, ?, ?, ?)";
   const values = [productName, category, price, description, image];
 
@@ -153,6 +163,36 @@ adminrouter.post("/addProduct", csrfProtection, upload.single("image"), (req, re
     }
     return res.json({ Status: "Success" });
   });
+});
+
+adminrouter.post("/addCoupon", csrfProtection, (req, res) => {
+  const { username, code, discount_type, discount_value, expiry_date } =
+    req.body;
+  const sql = `
+    INSERT INTO coupons (username, code, discount_type, discount_value, expiry_date)
+    VALUES (?, ?, ?, ?, ?)
+  `;
+  if (
+    typeof username !== 'string' || username.trim() === '' ||
+    typeof code !== 'string' || code.trim() === '' ||
+    typeof discount_type !== 'string' || discount_type.trim() === '' ||
+    isNaN(discount_value) || Number(discount_value) <= 0 ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(expiry_date) // YYYY-MM-DD
+  ) {
+    return res.json({ Status: false, Error: "Invalid input" });
+  }
+  db.query(
+    sql,
+    [username, code, discount_type, discount_value, expiry_date],
+    (err, result) => {
+      if (err) {
+        return res
+          .status(500)
+          .json({ Error: "Failed to add coupon", detail: err });
+      }
+      return res.json({ Status: "Coupon added" });
+    }
+  );
 });
 
 module.exports = adminrouter;

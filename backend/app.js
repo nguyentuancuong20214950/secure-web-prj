@@ -683,7 +683,7 @@ app.get("/order", csrfProtection, authMiddleware, async (req, res) => {
       return res.json({ orders: result });
     });
   } else {
-    const sql = "SELECT * FROM orders WHERE userid = ?";
+    const sql = "SELECT * FROM orders WHERE username = ?";
 
     db.query(sql, [username], (err, result) => {
       if (err) {

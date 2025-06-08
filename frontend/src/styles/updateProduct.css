@@ -1,29 +1,49 @@
+.form-container {
+  max-width: 600px;
+  margin: 2rem auto;
+  padding: 2rem;
+  border: 1px solid #ccc;
+  border-radius: 0.5rem;
+  background-color: #f9f9f9;
+}
+
+.input {
+  width: 100%;
+  padding: 0.5rem;
+  margin-top: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 0.25rem;
+  font-size: 1rem;
+}
+
+.input-container {
+  margin-bottom: 1rem;
+}
+
+.description {
+  height: 8rem;
+  resize: vertical;
+}
+
+.upload-button {
+  padding: 0.75rem 1.25rem;
+  background-color: #e53935;
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  margin-top: 1rem;
+}
+
+.upload-button:hover {
+  background-color: #c62828;
+}
+
 .success-message {
-    color: green;
-    font-weight: bold;
-    margin-top: 1rem;
-  }
-  
-  .input {
-    width: 100%;
-    padding: 0.5rem;
-    margin-top: 0.5rem;
-    border: 1px solid #ccc;
-    border-radius: 0.25rem;
-  }
-  
-  .input-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 0.5rem;
-    margin-top: 0.5rem;
-    border: 1px solid #ccc;
-    border-radius: 0.25rem;
-    cursor: pointer;
-  }
-  
-  .description {
-    height: 8rem; /* Adjust height as needed */
-  }
-  
+  color: green;
+  font-weight: bold;
+  margin-top: 1rem;
+}

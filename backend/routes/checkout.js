@@ -23,7 +23,13 @@ const logger = winston.createLogger({
 app.post("/checkout", csrfProtection, async (req, res) => {
   const { username, cartItems, totalAmount, couponCode } = req.body;
   const products = JSON.stringify(cartItems);
-  const timestamp = new Date().toISOString();
+  const getMySQLDateTime = () => {
+    const now = new Date();
+    const pad = (n) => n.toString().padStart(2, '0');
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  };
+  
+  const timestamp = getMySQLDateTime();
   const method = "COD";
 
   const userSql = "SELECT username, email FROM users WHERE username = ?";
@@ -44,6 +50,7 @@ app.post("/checkout", csrfProtection, async (req, res) => {
         WHERE code = ? AND username = ? AND is_used = FALSE AND (expiry_date IS NULL OR expiry_date > NOW())
       `;
       db.query(couponSql, [couponCode, uname], (couponErr, couponResults) => {
+        console.log("Coupon result:", couponResults);
         if (couponErr) return callback(couponErr);
         if (couponResults.length === 0) {
           return callback(new Error("Invalid or expired coupon."));
@@ -77,7 +84,8 @@ app.post("/checkout", csrfProtection, async (req, res) => {
 
       db.query(orderSql, values, (err, result) => {
         if (err) {
-          return res.json({ Status: false, Error: err });
+          console.error("Error inserting order:", err); 
+          return res.status(500).json({ Status: false, Error: "Failed to insert order" });
         }
 
         logger.info(`User ${uname} has checked out successfully.`, {
@@ -85,9 +93,9 @@ app.post("/checkout", csrfProtection, async (req, res) => {
         });
 
         const transporter = nodemailer.createTransport({
-          host: "smtp.google.com",
+          host: "smtp.gmail.com",
           port: 587,
-          secure: true,
+          secure: false,
           auth: {
             user: process.env.EMAIL_SENDER,
             pass: process.env.EMAIL_PASS,
@@ -99,7 +107,7 @@ app.post("/checkout", csrfProtection, async (req, res) => {
         const timeString = currentDate.toLocaleTimeString();
 
         const mailOptions = {
-          from: process.env.EMAIL,
+          from: process.env.EMAIL_SENDER,
           to: email,
           subject: "Order Confirmation",
           text: `Dear ${uname},

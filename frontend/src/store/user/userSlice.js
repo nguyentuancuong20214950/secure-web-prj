@@ -20,7 +20,9 @@ const userSlice = createSlice({
     },
     signInFailure: (state, action) => {
       state.loading = false;
-      state.error = action.payload;
+      state.currentUser = null;
+      // Chỉ lưu message thay vì object lỗi
+      state.error = action.payload?.response?.data?.Error || "Unknown error";
     },
     updateUserStart: (state) => {
       state.loading = true;
