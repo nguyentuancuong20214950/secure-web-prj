@@ -75,7 +75,7 @@ const Checkout = () => {
     axios.post('http://localhost:5001/auth/checkout', {
       username: currentUser?.username,
       cartItems,
-      totalAmount,
+      finalAmount,
       couponCode,
       _csrf: csrfToken,
     },{
